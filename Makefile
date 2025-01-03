@@ -40,8 +40,8 @@ else
   LD_FILE = linker/$(MCU_SUB_VARIANT).ld
 endif
 
-GIT_VERSION := $(shell git describe --dirty --always --tags)
-GIT_SUBMODULE_VERSIONS := $(shell git submodule status | cut -d" " -f3,4 | paste -s -d" " -)
+GIT_VERSION :=0.9.2-6
+GIT_SUBMODULE_VERSIONS := klingtech
 
 # compiled file name
 OUT_NAME = $(BOARD)_bootloader-$(GIT_VERSION)
@@ -75,14 +75,14 @@ RM = rm -rf
 CP = cp
 
 # Flasher utility options
-NRFUTIL = adafruit-nrfutil
-NRFJPROG = nrfjprog
-FLASHER ?= nrfjprog
+NRFUTIL = adafruit-nrfutil.exe
+NRFJPROG = nrfjprog.exe
+FLASHER ?= nrfjprog.exe
 PYOCD ?= pyocd
 
 # Flasher will default to nrfjprog,
 # Check for pyocd, error on unexpected value.
-ifeq ($(FLASHER),nrfjprog)
+ifeq ($(FLASHER),nrfjprog.exe)
   FLASH_CMD = $(NRFJPROG) --program $1 --sectoranduicrerase -f nrf52 --reset
   FLASH_NOUICR_CMD = $(NRFJPROG) --program $1 -f nrf52 --sectorerase --reset
   FLASH_ERASE_CMD = $(NRFJPROG) -f nrf52 --eraseall
@@ -142,6 +142,7 @@ C_SRC += src/boards/boards.c
 # nrfx
 C_SRC += $(NRFX_PATH)/drivers/src/nrfx_power.c
 C_SRC += $(NRFX_PATH)/drivers/src/nrfx_nvmc.c
+C_SRC += $(NRFX_PATH)/drivers/src/nrfx_clock.c  # Enable clock 
 C_SRC += $(NRFX_PATH)/mdk/system_$(MCU_SUB_VARIANT).c
 
 # SDK 11 files: serial + OTA DFU
@@ -305,9 +306,9 @@ CFLAGS += -D__HEAP_SIZE=0
 CFLAGS += -DCONFIG_GPIO_AS_PINRESET
 
 # Skip defining CONFIG_NFCT_PINS_AS_GPIOS if the device uses the NFCT.
-ifneq ($(USE_NFCT),yes)
-  CFLAGS += -DCONFIG_NFCT_PINS_AS_GPIOS
-endif
+# ifneq ($(USE_NFCT),yes)
+#   CFLAGS += -DCONFIG_NFCT_PINS_AS_GPIOS
+# endif
 
 CFLAGS += -DSOFTDEVICE_PRESENT
 CFLAGS += -DUF2_VERSION_BASE='"$(GIT_VERSION)"'
