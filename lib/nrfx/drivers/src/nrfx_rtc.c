@@ -1,6 +1,8 @@
 /*
- * Copyright (c) 2014 - 2019, Nordic Semiconductor ASA
+ * Copyright (c) 2014 - 2022, Nordic Semiconductor ASA
  * All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -53,7 +55,7 @@
                                         "UNKNOWN EVENT"))))))
 
 
-/**@brief RTC driver instance control block structure. */
+/** @brief RTC driver instance control block structure. */
 typedef struct
 {
     nrfx_drv_state_t state;        /**< Instance state. */
@@ -157,7 +159,9 @@ nrfx_err_t nrfx_rtc_cc_disable(nrfx_rtc_t const * p_instance, uint32_t channel)
             return err_code;
         }
     }
-    NRFX_LOG_INFO("RTC id: %d, channel disabled: %lu.", p_instance->instance_id, channel);
+    NRFX_LOG_INFO("RTC id: %d, channel disabled: %lu.",
+                  p_instance->instance_id,
+                  (unsigned long)channel);
     err_code = NRFX_SUCCESS;
     NRFX_LOG_INFO("Function: %s, error code: %s.", __func__, NRFX_LOG_ERROR_STRING_GET(err_code));
     return err_code;
@@ -186,7 +190,7 @@ nrfx_err_t nrfx_rtc_cc_set(nrfx_rtc_t const * p_instance,
         int32_t diff = cnt - val;
         if (cnt < val)
         {
-            diff += RTC_COUNTER_COUNTER_Msk;
+            diff += NRF_RTC_COUNTER_MAX;
         }
         if (diff < m_cb[p_instance->instance_id].tick_latency)
         {
@@ -211,8 +215,8 @@ nrfx_err_t nrfx_rtc_cc_set(nrfx_rtc_t const * p_instance,
 
     NRFX_LOG_INFO("RTC id: %d, channel enabled: %lu, compare value: %lu.",
                   p_instance->instance_id,
-                  channel,
-                  val);
+                  (unsigned long)channel,
+                  (unsigned long)val);
     err_code = NRFX_SUCCESS;
     NRFX_LOG_INFO("Function: %s, error code: %s.", __func__, NRFX_LOG_ERROR_STRING_GET(err_code));
     return err_code;
@@ -266,11 +270,11 @@ uint32_t nrfx_rtc_max_ticks_get(nrfx_rtc_t const * p_instance)
     uint32_t ticks;
     if (m_cb[p_instance->instance_id].reliable)
     {
-        ticks = RTC_COUNTER_COUNTER_Msk - m_cb[p_instance->instance_id].tick_latency;
+        ticks = NRF_RTC_COUNTER_MAX - m_cb[p_instance->instance_id].tick_latency;
     }
     else
     {
-        ticks = RTC_COUNTER_COUNTER_Msk;
+        ticks = NRF_RTC_COUNTER_MAX;
     }
     return ticks;
 }
@@ -290,7 +294,9 @@ static void irq_handler(NRF_RTC_Type * p_reg,
             nrf_rtc_event_disable(p_reg, int_mask);
             nrf_rtc_int_disable(p_reg, int_mask);
             nrf_rtc_event_clear(p_reg, event);
-            NRFX_LOG_DEBUG("Event: %s, instance id: %lu.", EVT_TO_STR(event), instance_id);
+            NRFX_LOG_DEBUG("Event: %s, instance id: %lu.",
+                           EVT_TO_STR(event),
+                           (unsigned long)instance_id);
             m_handlers[instance_id]((nrfx_rtc_int_type_t)i);
         }
         int_mask <<= 1;
@@ -301,7 +307,9 @@ static void irq_handler(NRF_RTC_Type * p_reg,
     if (nrf_rtc_int_enable_check(p_reg, NRF_RTC_INT_TICK_MASK) && nrf_rtc_event_check(p_reg, event))
     {
         nrf_rtc_event_clear(p_reg, event);
-        NRFX_LOG_DEBUG("Event: %s, instance id: %lu.", EVT_TO_STR(event), instance_id);
+        NRFX_LOG_DEBUG("Event: %s, instance id: %lu.",
+                       EVT_TO_STR(event),
+                       (unsigned long)instance_id);
         m_handlers[instance_id](NRFX_RTC_INT_TICK);
     }
 
@@ -310,7 +318,9 @@ static void irq_handler(NRF_RTC_Type * p_reg,
         nrf_rtc_event_check(p_reg, event))
     {
         nrf_rtc_event_clear(p_reg, event);
-        NRFX_LOG_DEBUG("Event: %s, instance id: %lu.", EVT_TO_STR(event), instance_id);
+        NRFX_LOG_DEBUG("Event: %s, instance id: %lu.",
+                       EVT_TO_STR(event),
+                       (unsigned long)instance_id);
         m_handlers[instance_id](NRFX_RTC_INT_OVERFLOW);
     }
 }

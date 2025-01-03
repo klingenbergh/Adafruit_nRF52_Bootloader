@@ -1,6 +1,8 @@
 /*
- * Copyright (c) 2015 - 2019, Nordic Semiconductor ASA
+ * Copyright (c) 2015 - 2022, Nordic Semiconductor ASA
  * All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -38,12 +40,25 @@
 extern "C" {
 #endif
 
+#ifndef NRF_WDT0
+#define NRF_WDT0 NRF_WDT
+#endif
+
 /**
  * @defgroup nrf_wdt_hal WDT HAL
  * @{
  * @ingroup nrf_wdt
  * @brief   Hardware access layer for managing the Watchdog Timer (WDT) peripheral.
  */
+
+/**
+ * @brief Macro getting pointer to the structure of registers of the WDT peripheral.
+ *
+ * @param[in] idx WDT instance index.
+ *
+ * @return Pointer to the structure of registers of the WDT peripheral.
+ */
+#define NRF_WDT_INST_GET(idx) NRFX_CONCAT_2(NRF_WDT, idx)
 
 /** @brief Number of WDT channels. */
 #define NRF_WDT_CHANNEL_NUMBER 0x8UL
@@ -313,10 +328,7 @@ NRF_STATIC_INLINE void nrf_wdt_task_trigger(NRF_WDT_Type * p_reg, nrf_wdt_task_t
 NRF_STATIC_INLINE void nrf_wdt_event_clear(NRF_WDT_Type * p_reg, nrf_wdt_event_t event)
 {
     *((volatile uint32_t *)((uint8_t *)p_reg + (uint32_t)event)) = 0x0UL;
-#if __CORTEX_M == 0x04
-    volatile uint32_t dummy = *((volatile uint32_t *)((uint8_t *)p_reg + (uint32_t)event));
-    (void)dummy;
-#endif
+    nrf_event_readback((uint8_t *)p_reg + (uint32_t)event);
 }
 
 NRF_STATIC_INLINE bool nrf_wdt_event_check(NRF_WDT_Type const * p_reg, nrf_wdt_event_t event)

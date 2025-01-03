@@ -1,6 +1,8 @@
 /*
- * Copyright (c) 2012 - 2019, Nordic Semiconductor ASA
+ * Copyright (c) 2012 - 2022, Nordic Semiconductor ASA
  * All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -349,7 +351,23 @@ NRF_STATIC_INLINE void nrf_nvmc_page_partial_erase_start(NRF_NVMC_Type * p_reg,
 NRF_STATIC_INLINE void nrf_nvmc_icache_config_set(NRF_NVMC_Type *          p_reg,
                                                   nrf_nvmc_icache_config_t config)
 {
-    p_reg->ICACHECNF = (uint32_t)config;
+#if defined(NRF5340_XXAA_NETWORK) || defined(NRF9160_XXAA)
+    // Apply workaround for the anomalies:
+    // - 6 for the nRF5340.
+    // - 21 for the nRF9160.
+    if (config == NRF_NVMC_ICACHE_DISABLE)
+    {
+        NRFX_CRITICAL_SECTION_ENTER();
+        __ISB();
+        p_reg->ICACHECNF = (uint32_t)NRF_NVMC_ICACHE_DISABLE;
+        __ISB();
+        NRFX_CRITICAL_SECTION_EXIT();
+    }
+    else
+#endif
+    {
+        p_reg->ICACHECNF = (uint32_t)config;
+    }
 }
 
 NRF_STATIC_INLINE bool nrf_nvmc_icache_enable_check(NRF_NVMC_Type const * p_reg)

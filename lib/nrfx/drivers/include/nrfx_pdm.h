@@ -1,6 +1,8 @@
 /*
- * Copyright (c) 2015 - 2019, Nordic Semiconductor ASA
+ * Copyright (c) 2015 - 2022, Nordic Semiconductor ASA
  * All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -67,15 +69,52 @@ typedef struct
 /** @brief PDM interface driver configuration structure. */
 typedef struct
 {
-    nrf_pdm_mode_t mode;               ///< Interface operation mode.
-    nrf_pdm_edge_t edge;               ///< Sampling mode.
-    uint8_t        pin_clk;            ///< CLK pin.
-    uint8_t        pin_din;            ///< DIN pin.
-    nrf_pdm_freq_t clock_freq;         ///< Clock frequency.
-    nrf_pdm_gain_t gain_l;             ///< Left channel gain.
-    nrf_pdm_gain_t gain_r;             ///< Right channel gain.
-    uint8_t        interrupt_priority; ///< Interrupt priority.
+    nrf_pdm_mode_t    mode;               ///< Interface operation mode.
+    nrf_pdm_edge_t    edge;               ///< Sampling mode.
+    uint8_t           pin_clk;            ///< CLK pin.
+    uint8_t           pin_din;            ///< DIN pin.
+    nrf_pdm_freq_t    clock_freq;         ///< Clock frequency.
+    nrf_pdm_gain_t    gain_l;             ///< Left channel gain.
+    nrf_pdm_gain_t    gain_r;             ///< Right channel gain.
+    uint8_t           interrupt_priority; ///< Interrupt priority.
+#if NRF_PDM_HAS_RATIO_CONFIG
+    nrf_pdm_ratio_t   ratio;              ///< Ratio between PDM_CLK and output sample rate.
+#endif
+#if NRF_PDM_HAS_MCLKCONFIG
+    nrf_pdm_mclksrc_t mclksrc;            ///< Master clock source selection.
+#endif
+    bool              skip_gpio_cfg;      ///< Skip GPIO configuration of pins.
+                                          /**< When set to true, the driver does not modify
+                                           *   any GPIO parameters of the used pins. Those
+                                           *   parameters are supposed to be configured
+                                           *   externally before the driver is initialized. */
+    bool              skip_psel_cfg;      ///< Skip pin selection configuration.
+                                          /**< When set to true, the driver does not modify
+                                           *   pin select registers in the peripheral.
+                                           *   Those registers are supposed to be set up
+                                           *   externally before the driver is initialized.
+                                           *   @note When both GPIO configuration and pin
+                                           *   selection are to be skipped, the structure
+                                           *   fields that specify pins can be omitted,
+                                           *   as they are ignored anyway. */
 } nrfx_pdm_config_t;
+
+
+#if NRF_PDM_HAS_RATIO_CONFIG || defined(__NRFX_DOXYGEN__)
+    /** @brief PDM additional ratio configuration. */
+    #define NRFX_PDM_DEFAULT_EXTENDED_RATIO_CONFIG \
+        .ratio = NRF_PDM_RATIO_64X,
+#else
+    #define NRFX_PDM_DEFAULT_EXTENDED_RATIO_CONFIG
+#endif
+
+#if NRF_PDM_HAS_MCLKCONFIG || defined(__NRFX_DOXYGEN__)
+    /** @brief PDM additional master clock source configuration. */
+    #define NRFX_PDM_DEFAULT_EXTENDED_MCLKSRC_CONFIG \
+        .mclksrc = NRF_PDM_MCLKSRC_PCLK32M,
+#else
+    #define NRFX_PDM_DEFAULT_EXTENDED_MCLKSRC_CONFIG
+#endif
 
 /**
  * @brief PDM driver default configuration.
@@ -98,7 +137,9 @@ typedef struct
     .clock_freq         = NRF_PDM_FREQ_1032K,                   \
     .gain_l             = NRF_PDM_GAIN_DEFAULT,                 \
     .gain_r             = NRF_PDM_GAIN_DEFAULT,                 \
-    .interrupt_priority = NRFX_PDM_DEFAULT_CONFIG_IRQ_PRIORITY  \
+    .interrupt_priority = NRFX_PDM_DEFAULT_CONFIG_IRQ_PRIORITY, \
+    NRFX_PDM_DEFAULT_EXTENDED_RATIO_CONFIG                      \
+    NRFX_PDM_DEFAULT_EXTENDED_MCLKSRC_CONFIG                    \
 }
 
 /**
@@ -187,12 +228,12 @@ nrfx_err_t nrfx_pdm_buffer_set(int16_t * buffer, uint16_t buffer_length);
 #ifndef NRFX_DECLARE_ONLY
 NRFX_STATIC_INLINE uint32_t nrfx_pdm_task_address_get(nrf_pdm_task_t task)
 {
-    return nrf_pdm_task_address_get(NRF_PDM, task);
+    return nrf_pdm_task_address_get(NRF_PDM0, task);
 }
 
 NRFX_STATIC_INLINE bool nrfx_pdm_enable_check(void)
 {
-    return nrf_pdm_enable_check(NRF_PDM);
+    return nrf_pdm_enable_check(NRF_PDM0);
 }
 #endif // NRFX_DECLARE_ONLY
 

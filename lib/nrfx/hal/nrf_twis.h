@@ -1,6 +1,8 @@
 /*
- * Copyright (c) 2015 - 2019, Nordic Semiconductor ASA
+ * Copyright (c) 2015 - 2022, Nordic Semiconductor ASA
  * All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -45,6 +47,15 @@ extern "C" {
  * @brief   Hardware access layer for managing the Two Wire Interface Slave with EasyDMA
  *          (TWIS) peripheral.
  */
+
+/**
+ * @brief Macro getting pointer to the structure of registers of the TWIS peripheral.
+ *
+ * @param[in] idx TWIS instance index.
+ *
+ * @return Pointer to the structure of registers of the TWIS peripheral.
+ */
+#define NRF_TWIS_INST_GET(idx) NRFX_CONCAT_2(NRF_TWIS, idx)
 
 /** @brief TWIS tasks. */
 typedef enum
@@ -322,6 +333,24 @@ NRF_STATIC_INLINE void nrf_twis_disable(NRF_TWIS_Type * p_reg);
 NRF_STATIC_INLINE void nrf_twis_pins_set(NRF_TWIS_Type * p_reg, uint32_t scl, uint32_t sda);
 
 /**
+ * @brief Function for retrieving the SCL pin selection.
+ *
+ * @param[in] p_reg Pointer to the structure of registers of the peripheral.
+ *
+ * @return SCL pin selection.
+ */
+NRF_STATIC_INLINE uint32_t nrf_twis_scl_pin_get(NRF_TWIS_Type const * p_reg);
+
+/**
+ * @brief Function for retrieving the SDA pin selection.
+ *
+ * @param[in] p_reg Pointer to the structure of registers of the peripheral.
+ *
+ * @return SDA pin selection.
+ */
+NRF_STATIC_INLINE uint32_t nrf_twis_sda_pin_get(NRF_TWIS_Type const * p_reg);
+
+/**
  * @brief Function for setting the receive buffer.
  *
  * @param[in] p_reg  Pointer to the structure of registers of the peripheral.
@@ -547,10 +576,7 @@ NRF_STATIC_INLINE uint32_t nrf_twis_task_address_get(NRF_TWIS_Type const * p_reg
 NRF_STATIC_INLINE void nrf_twis_event_clear(NRF_TWIS_Type * p_reg, nrf_twis_event_t event)
 {
     *(nrf_twis_getRegPtr(p_reg, (uint32_t)event)) = 0UL;
-#if __CORTEX_M == 0x04
-    volatile uint32_t dummy = *((volatile uint32_t *)((uint8_t *)p_reg + (uint32_t)event));
-    (void)dummy;
-#endif
+    nrf_event_readback((uint8_t *)p_reg + (uint32_t)event);
 }
 
 NRF_STATIC_INLINE bool nrf_twis_event_check(NRF_TWIS_Type const * p_reg, nrf_twis_event_t event)
@@ -668,6 +694,16 @@ NRF_STATIC_INLINE void nrf_twis_pins_set(NRF_TWIS_Type * p_reg, uint32_t scl, ui
 {
     p_reg->PSEL.SCL = scl;
     p_reg->PSEL.SDA = sda;
+}
+
+NRF_STATIC_INLINE uint32_t nrf_twis_scl_pin_get(NRF_TWIS_Type const * p_reg)
+{
+    return p_reg->PSEL.SCL;
+}
+
+NRF_STATIC_INLINE uint32_t nrf_twis_sda_pin_get(NRF_TWIS_Type const * p_reg)
+{
+    return p_reg->PSEL.SDA;
 }
 
 NRF_STATIC_INLINE void nrf_twis_rx_buffer_set(NRF_TWIS_Type * p_reg,

@@ -1,6 +1,8 @@
 /*
- * Copyright (c) 2015 - 2019, Nordic Semiconductor ASA
+ * Copyright (c) 2015 - 2022, Nordic Semiconductor ASA
  * All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -45,6 +47,22 @@ extern "C" {
  * @brief   Hardware access layer for managing the TWIM peripheral.
  */
 
+/**
+ * @brief Macro getting pointer to the structure of registers of the TWIM peripheral.
+ *
+ * @param[in] idx TWIM instance index.
+ *
+ * @return Pointer to the structure of registers of the TWIM peripheral.
+ */
+#define NRF_TWIM_INST_GET(idx) NRFX_CONCAT_2(NRF_TWIM, idx)
+
+#if defined(TWIM_FREQUENCY_FREQUENCY_K1000) || defined(__NRFX_DOXYGEN__)
+/** @brief Symbol indicating whether 1000 kHz clock frequency is available. */
+#define NRF_TWIM_HAS_1000_KHZ_FREQ 1
+#else
+#define NRF_TWIM_HAS_1000_KHZ_FREQ 0
+#endif
+
 /** @brief TWIM tasks. */
 typedef enum
 {
@@ -60,7 +78,7 @@ typedef enum
 {
     NRF_TWIM_EVENT_STOPPED   = offsetof(NRF_TWIM_Type, EVENTS_STOPPED),   ///< TWI stopped.
     NRF_TWIM_EVENT_ERROR     = offsetof(NRF_TWIM_Type, EVENTS_ERROR),     ///< TWI error.
-    NRF_TWIM_EVENT_SUSPENDED = 0x148,                                     ///< TWI suspended.
+    NRF_TWIM_EVENT_SUSPENDED = offsetof(NRF_TWIM_Type, EVENTS_SUSPENDED), ///< TWI suspended.
     NRF_TWIM_EVENT_RXSTARTED = offsetof(NRF_TWIM_Type, EVENTS_RXSTARTED), ///< Receive sequence started.
     NRF_TWIM_EVENT_TXSTARTED = offsetof(NRF_TWIM_Type, EVENTS_TXSTARTED), ///< Transmit sequence started.
     NRF_TWIM_EVENT_LASTRX    = offsetof(NRF_TWIM_Type, EVENTS_LASTRX),    ///< Byte boundary, starting to receive the last byte.
@@ -104,9 +122,12 @@ typedef enum
 /** @brief TWIM master clock frequency. */
 typedef enum
 {
-    NRF_TWIM_FREQ_100K = TWIM_FREQUENCY_FREQUENCY_K100, ///< 100 kbps.
-    NRF_TWIM_FREQ_250K = TWIM_FREQUENCY_FREQUENCY_K250, ///< 250 kbps.
-    NRF_TWIM_FREQ_400K = TWIM_FREQUENCY_FREQUENCY_K400  ///< 400 kbps.
+    NRF_TWIM_FREQ_100K  = TWIM_FREQUENCY_FREQUENCY_K100, ///< 100 kbps.
+    NRF_TWIM_FREQ_250K  = TWIM_FREQUENCY_FREQUENCY_K250, ///< 250 kbps.
+    NRF_TWIM_FREQ_400K  = TWIM_FREQUENCY_FREQUENCY_K400, ///< 400 kbps.
+#if NRF_TWIM_HAS_1000_KHZ_FREQ
+    NRF_TWIM_FREQ_1000K = TWIM_FREQUENCY_FREQUENCY_K1000 ///< 1000 kbps.
+#endif
 } nrf_twim_frequency_t;
 
 /** @brief TWIM error source. */
@@ -290,6 +311,24 @@ NRF_STATIC_INLINE void nrf_twim_pins_set(NRF_TWIM_Type * p_reg,
                                          uint32_t        sda_pin);
 
 /**
+ * @brief Function for retrieving the SCL pin selection.
+ *
+ * @param[in] p_reg Pointer to the structure of registers of the peripheral.
+ *
+ * @return SCL pin selection.
+ */
+NRF_STATIC_INLINE uint32_t nrf_twim_scl_pin_get(NRF_TWIM_Type const * p_reg);
+
+/**
+ * @brief Function for retrieving the SDA pin selection.
+ *
+ * @param[in] p_reg Pointer to the structure of registers of the peripheral.
+ *
+ * @return SDA pin selection.
+ */
+NRF_STATIC_INLINE uint32_t nrf_twim_sda_pin_get(NRF_TWIM_Type const * p_reg);
+
+/**
  * @brief Function for setting the TWI master clock frequency.
  *
  * @param[in] p_reg     Pointer to the structure of registers of the peripheral.
@@ -348,6 +387,15 @@ NRF_STATIC_INLINE void nrf_twim_rx_buffer_set(NRF_TWIM_Type * p_reg,
  */
 NRF_STATIC_INLINE void nrf_twim_shorts_set(NRF_TWIM_Type * p_reg,
                                            uint32_t        mask);
+
+/**
+ * @brief Function for getting the shortcut setting.
+ *
+ * @param[in] p_reg Pointer to the structure of registers of the peripheral.
+ *
+ * @return Current shortcut configuration.
+ */
+NRF_STATIC_INLINE uint32_t nrf_twim_shorts_get(NRF_TWIM_Type const * p_reg);
 
 /**
  * @brief Function for getting the amount of transmitted bytes.
@@ -414,10 +462,7 @@ NRF_STATIC_INLINE void nrf_twim_event_clear(NRF_TWIM_Type * p_reg,
                                             nrf_twim_event_t event)
 {
     *((volatile uint32_t *)((uint8_t *)p_reg + (uint32_t)event)) = 0x0UL;
-#if __CORTEX_M == 0x04
-    volatile uint32_t dummy = *((volatile uint32_t *)((uint8_t *)p_reg + (uint32_t)event));
-    (void)dummy;
-#endif
+    nrf_event_readback((uint8_t *)p_reg + (uint32_t)event);
 }
 
 NRF_STATIC_INLINE bool nrf_twim_event_check(NRF_TWIM_Type const * p_reg,
@@ -509,6 +554,16 @@ NRF_STATIC_INLINE void nrf_twim_pins_set(NRF_TWIM_Type * p_reg,
     p_reg->PSEL.SDA = sda_pin;
 }
 
+NRF_STATIC_INLINE uint32_t nrf_twim_scl_pin_get(NRF_TWIM_Type const * p_reg)
+{
+    return p_reg->PSEL.SCL;
+}
+
+NRF_STATIC_INLINE uint32_t nrf_twim_sda_pin_get(NRF_TWIM_Type const * p_reg)
+{
+    return p_reg->PSEL.SDA;
+}
+
 NRF_STATIC_INLINE void nrf_twim_frequency_set(NRF_TWIM_Type * p_reg,
                                               nrf_twim_frequency_t frequency)
 {
@@ -551,6 +606,11 @@ NRF_STATIC_INLINE void nrf_twim_shorts_set(NRF_TWIM_Type * p_reg,
                                            uint32_t mask)
 {
     p_reg->SHORTS = mask;
+}
+
+NRF_STATIC_INLINE uint32_t nrf_twim_shorts_get(NRF_TWIM_Type const * p_reg)
+{
+    return p_reg->SHORTS;
 }
 
 NRF_STATIC_INLINE size_t nrf_twim_txd_amount_get(NRF_TWIM_Type const * p_reg)

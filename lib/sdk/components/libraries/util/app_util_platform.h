@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014 - 2017, Nordic Semiconductor ASA
+ * Copyright (c) 2014 - 2018, Nordic Semiconductor ASA
  * 
  * All rights reserved.
  * 
@@ -52,8 +52,10 @@
 #include <stdint.h>
 #include "compiler_abstraction.h"
 #include "nrf.h"
+#ifdef SOFTDEVICE_PRESENT
 #include "nrf_soc.h"
 #include "nrf_nvic.h"
+#endif
 #include "nrf_assert.h"
 #include "app_error.h"
 
@@ -120,7 +122,7 @@ typedef enum
 /**@brief Macro for setting a breakpoint.
  */
 #if defined(__GNUC__)
-#define NRF_BREAKPOINT __builtin_trap()
+#define NRF_BREAKPOINT __asm__("BKPT 0");
 #else
 #define NRF_BREAKPOINT __BKPT(0)
 #endif
@@ -144,14 +146,26 @@ typedef enum
 #endif // __CORTEX_M == 0x04
 
 #if defined ( __CC_ARM )
-#define PACKED(TYPE) __packed TYPE
 #define PACKED_STRUCT PACKED(struct)
 #elif defined   ( __GNUC__ )
-#define PACKED __attribute__((packed))
 #define PACKED_STRUCT struct PACKED
 #elif defined (__ICCARM__)
 #define PACKED_STRUCT __packed struct
 #endif
+
+#if defined ( __CC_ARM )
+#define PRAGMA_OPTIMIZATION_FORCE_START _Pragma ("push") \
+                                        _Pragma ("O3")
+#define PRAGMA_OPTIMIZATION_FORCE_END   _Pragma ("pop")
+#elif defined   ( __GNUC__ )
+#define PRAGMA_OPTIMIZATION_FORCE_START _Pragma("GCC push_options") \
+                                        _Pragma ("GCC optimize (\"Os\")")
+#define PRAGMA_OPTIMIZATION_FORCE_END   _Pragma ("GCC pop_options")
+#elif defined (__ICCARM__)
+#define PRAGMA_OPTIMIZATION_FORCE_START _Pragma ("optimize=high z")
+#define PRAGMA_OPTIMIZATION_FORCE_END
+#endif
+
 
 void app_util_critical_region_enter (uint8_t *p_nested);
 void app_util_critical_region_exit (uint8_t nested);
@@ -195,12 +209,14 @@ void app_util_critical_region_exit (uint8_t nested);
 /**@brief Macro to enable anonymous unions from a certain point in the code.
  */
 #if defined(__CC_ARM)
-    #define ANON_UNIONS_ENABLE _Pragma("push") \
-                               _Pragma("anon_unions")
+    #define ANON_UNIONS_ENABLE _Pragma("push")        \
+                               _Pragma("anon_unions") \
+                               struct semicolon_swallower
 #elif defined(__ICCARM__)
-    #define ANON_UNIONS_ENABLE _Pragma("language=extended")
+    #define ANON_UNIONS_ENABLE _Pragma("language=extended") \
+                               struct semicolon_swallower
 #else
-    #define ANON_UNIONS_ENABLE
+    #define ANON_UNIONS_ENABLE struct semicolon_swallower
     // No action will be taken.
     // For GCC anonymous unions are enabled by default.
 #endif
@@ -209,12 +225,13 @@ void app_util_critical_region_exit (uint8_t nested);
  * @note Call only after first calling @ref ANON_UNIONS_ENABLE.
  */
 #if defined(__CC_ARM)
-    #define ANON_UNIONS_DISABLE _Pragma("pop")
+    #define ANON_UNIONS_DISABLE _Pragma("pop") \
+                                struct semicolon_swallower
 #elif defined(__ICCARM__)
-    #define ANON_UNIONS_DISABLE
+    #define ANON_UNIONS_DISABLE struct semicolon_swallower
     // for IAR leave anonymous unions enabled
 #else
-    #define ANON_UNIONS_DISABLE
+    #define ANON_UNIONS_DISABLE struct semicolon_swallower
     // No action will be taken.
     // For GCC anonymous unions are enabled by default.
 #endif

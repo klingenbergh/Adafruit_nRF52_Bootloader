@@ -284,6 +284,7 @@ CFLAGS += \
 	-Wwrite-strings \
 	-Wsign-compare \
 	-Wmissing-format-attribute \
+	-Wno-error=undef \
 	-Wno-endif-labels \
 	-Wunreachable-code
 

@@ -1,6 +1,8 @@
 /*
- * Copyright (c) 2015 - 2019, Nordic Semiconductor ASA
+ * Copyright (c) 2015 - 2022, Nordic Semiconductor ASA
  * All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -66,37 +68,54 @@ typedef struct
     volatile bool             tx_abort;
     bool                      rx_enabled;
     nrfx_drv_state_t          state;
+    bool                      skip_gpio_cfg : 1;
+    bool                      skip_psel_cfg : 1;
 } uart_control_block_t;
 static uart_control_block_t m_cb[NRFX_UART_ENABLED_COUNT];
 
 static void apply_config(nrfx_uart_t        const * p_instance,
                          nrfx_uart_config_t const * p_config)
 {
-    if (p_config->pseltxd != NRF_UART_PSEL_DISCONNECTED)
-    {
-        nrf_gpio_pin_set(p_config->pseltxd);
-        nrf_gpio_cfg_output(p_config->pseltxd);
-    }
-    if (p_config->pselrxd != NRF_UART_PSEL_DISCONNECTED)
-    {
-        nrf_gpio_cfg_input(p_config->pselrxd, NRF_GPIO_PIN_NOPULL);
-    }
-
     nrf_uart_baudrate_set(p_instance->p_reg, p_config->baudrate);
     nrf_uart_configure(p_instance->p_reg, &p_config->hal_cfg);
-    nrf_uart_txrx_pins_set(p_instance->p_reg, p_config->pseltxd, p_config->pselrxd);
+
+    if (!p_config->skip_gpio_cfg)
+    {
+        if (p_config->pseltxd != NRF_UART_PSEL_DISCONNECTED)
+        {
+            nrf_gpio_pin_set(p_config->pseltxd);
+            nrf_gpio_cfg_output(p_config->pseltxd);
+        }
+        if (p_config->pselrxd != NRF_UART_PSEL_DISCONNECTED)
+        {
+            nrf_gpio_cfg_input(p_config->pselrxd, NRF_GPIO_PIN_NOPULL);
+        }
+    }
+    if (!p_config->skip_psel_cfg)
+    {
+        nrf_uart_txrx_pins_set(p_instance->p_reg,
+                               p_config->pseltxd, p_config->pselrxd);
+    }
+
     if (p_config->hal_cfg.hwfc == NRF_UART_HWFC_ENABLED)
     {
-        if (p_config->pselcts != NRF_UART_PSEL_DISCONNECTED)
+        if (!p_config->skip_gpio_cfg)
         {
-            nrf_gpio_cfg_input(p_config->pselcts, NRF_GPIO_PIN_NOPULL);
+            if (p_config->pselrts != NRF_UART_PSEL_DISCONNECTED)
+            {
+                nrf_gpio_pin_set(p_config->pselrts);
+                nrf_gpio_cfg_output(p_config->pselrts);
+            }
+            if (p_config->pselcts != NRF_UART_PSEL_DISCONNECTED)
+            {
+                nrf_gpio_cfg_input(p_config->pselcts, NRF_GPIO_PIN_NOPULL);
+            }
         }
-        if (p_config->pselrts != NRF_UART_PSEL_DISCONNECTED)
+        if (!p_config->skip_psel_cfg)
         {
-            nrf_gpio_pin_set(p_config->pselrts);
-            nrf_gpio_cfg_output(p_config->pselrts);
+            nrf_uart_hwfc_pins_set(p_instance->p_reg,
+                                   p_config->pselrts, p_config->pselcts);
         }
-        nrf_uart_hwfc_pins_set(p_instance->p_reg, p_config->pselrts, p_config->pselcts);
     }
 }
 
@@ -123,6 +142,8 @@ static void interrupts_disable(nrfx_uart_t const * p_instance)
 
 static void pins_to_default(nrfx_uart_t const * p_instance)
 {
+    uart_control_block_t const * p_cb = &m_cb[p_instance->drv_inst_idx];
+
     /* Reset pins to default states */
     uint32_t txd;
     uint32_t rxd;
@@ -133,24 +154,31 @@ static void pins_to_default(nrfx_uart_t const * p_instance)
     rxd = nrf_uart_rx_pin_get(p_instance->p_reg);
     rts = nrf_uart_rts_pin_get(p_instance->p_reg);
     cts = nrf_uart_cts_pin_get(p_instance->p_reg);
-    nrf_uart_txrx_pins_disconnect(p_instance->p_reg);
-    nrf_uart_hwfc_pins_disconnect(p_instance->p_reg);
 
-    if (txd != NRF_UART_PSEL_DISCONNECTED)
+    if (!p_cb->skip_psel_cfg)
     {
-        nrf_gpio_cfg_default(txd);
+        nrf_uart_txrx_pins_disconnect(p_instance->p_reg);
+        nrf_uart_hwfc_pins_disconnect(p_instance->p_reg);
     }
-    if (rxd != NRF_UART_PSEL_DISCONNECTED)
+
+    if (!p_cb->skip_gpio_cfg)
     {
-        nrf_gpio_cfg_default(rxd);
-    }
-    if (cts != NRF_UART_PSEL_DISCONNECTED)
-    {
-        nrf_gpio_cfg_default(cts);
-    }
-    if (rts != NRF_UART_PSEL_DISCONNECTED)
-    {
-        nrf_gpio_cfg_default(rts);
+        if (txd != NRF_UART_PSEL_DISCONNECTED)
+        {
+            nrf_gpio_cfg_default(txd);
+        }
+        if (rxd != NRF_UART_PSEL_DISCONNECTED)
+        {
+            nrf_gpio_cfg_default(rxd);
+        }
+        if (cts != NRF_UART_PSEL_DISCONNECTED)
+        {
+            nrf_gpio_cfg_default(cts);
+        }
+        if (rts != NRF_UART_PSEL_DISCONNECTED)
+        {
+            nrf_gpio_cfg_default(rts);
+        }
     }
 }
 
@@ -188,6 +216,9 @@ nrfx_err_t nrfx_uart_init(nrfx_uart_t const *        p_instance,
     }
 #endif // NRFX_CHECK(NRFX_PRS_ENABLED)
 
+    p_cb->skip_gpio_cfg = p_config->skip_gpio_cfg;
+    p_cb->skip_psel_cfg = p_config->skip_psel_cfg;
+
     apply_config(p_instance, p_config);
 
     p_cb->handler   = event_handler;
@@ -204,9 +235,9 @@ nrfx_err_t nrfx_uart_init(nrfx_uart_t const *        p_instance,
     p_cb->rx_enabled                 = false;
     p_cb->tx_buffer_length           = 0;
     p_cb->state                      = NRFX_DRV_STATE_INITIALIZED;
-    NRFX_LOG_WARNING("Function: %s, error code: %s.",
-                     __func__,
-                     NRFX_LOG_ERROR_STRING_GET(err_code));
+    NRFX_LOG_INFO("Function: %s, error code: %s.",
+                  __func__,
+                  NRFX_LOG_ERROR_STRING_GET(err_code));
     return err_code;
 }
 
@@ -328,7 +359,6 @@ bool nrfx_uart_tx_in_progress(nrfx_uart_t const * p_instance)
 static void rx_enable(nrfx_uart_t const * p_instance)
 {
     nrf_uart_event_clear(p_instance->p_reg, NRF_UART_EVENT_ERROR);
-    nrf_uart_event_clear(p_instance->p_reg, NRF_UART_EVENT_RXDRDY);
     nrf_uart_task_trigger(p_instance->p_reg, NRF_UART_TASK_STARTRX);
 }
 

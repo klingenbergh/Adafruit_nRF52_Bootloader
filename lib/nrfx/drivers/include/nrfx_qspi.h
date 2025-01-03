@@ -1,6 +1,8 @@
 /*
- * Copyright (c) 2016 - 2019, Nordic Semiconductor ASA
+ * Copyright (c) 2016 - 2022, Nordic Semiconductor ASA
  * All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -49,11 +51,25 @@ extern "C" {
 /** @brief QSPI driver instance configuration structure. */
 typedef struct
 {
-    uint32_t             xip_offset;   /**< Address offset into the external memory for Execute in Place operation. */
-    nrf_qspi_pins_t      pins;         /**< Pin configuration structure. */
-    nrf_qspi_prot_conf_t prot_if;      /**< Protocol layer interface configuration structure. */
-    nrf_qspi_phy_conf_t  phy_if;       /**< Physical layer interface configuration structure. */
-    uint8_t              irq_priority; /**< Interrupt priority. */
+    uint32_t             xip_offset;    ///< Address offset into the external memory for Execute in Place operation.
+    nrf_qspi_pins_t      pins;          ///< Pin configuration structure.
+    nrf_qspi_prot_conf_t prot_if;       ///< Protocol layer interface configuration structure.
+    nrf_qspi_phy_conf_t  phy_if;        ///< Physical layer interface configuration structure.
+    uint8_t              irq_priority;  ///< Interrupt priority.
+    bool                 skip_gpio_cfg; ///< Skip GPIO configuration of pins.
+                                        /**< When set to true, the driver does not modify
+                                         *   any GPIO parameters of the used pins. Those
+                                         *   parameters are supposed to be configured
+                                         *   externally before the driver is initialized. */
+    bool                 skip_psel_cfg; ///< Skip pin selection configuration.
+                                        /**< When set to true, the driver does not modify
+                                         *   pin select registers in the peripheral.
+                                         *   Those registers are supposed to be set up
+                                         *   externally before the driver is initialized.
+                                         *   @note When both GPIO configuration and pin
+                                         *   selection are to be skipped, the structure
+                                         *   fields that specify pins can be omitted,
+                                         *   as they are ignored anyway. */
 } nrfx_qspi_config_t;
 
 /**
@@ -66,7 +82,7 @@ typedef struct
  * - PP opcode for writing
  * - 24 bit addressing mode
  * - Deep Power-down disabled
- * - clock frequency 2 MHz
+ * - clock frequency: 2 MHz for nRF52 Series, 6 MHz for nRF53 Series
  * - SCK delay 5 clock ticks
  * - mode 0 (data captured on the clock rising edge and transmitted on a falling edge. Clock base level is '0')
  *
@@ -99,7 +115,7 @@ typedef struct
         .sck_delay = 0x05,                                             \
         .dpmen     = false,                                            \
         .spi_mode  = NRF_QSPI_MODE_0,                                  \
-        .sck_freq  = NRF_QSPI_FREQ_32MDIV16,                           \
+        .sck_freq  = NRF_QSPI_FREQ_DIV16,                              \
     },                                                                 \
     .irq_priority  = (uint8_t)NRFX_QSPI_DEFAULT_CONFIG_IRQ_PRIORITY,   \
 }
@@ -124,6 +140,44 @@ typedef enum
     NRFX_QSPI_EVENT_DONE, /**< Transfer done. */
 } nrfx_qspi_evt_t;
 
+/**
+ * @brief QSPI master driver extended event types,
+ *        obtained using @ref nrfx_qspi_event_extended_get() function.
+ */
+typedef enum
+{
+    NRFX_QSPI_EVENT_NONE,       /**< No event occurence. */
+    NRFX_QSPI_EVENT_WRITE_DONE, /**< Write done. */
+    NRFX_QSPI_EVENT_READ_DONE,  /**< Read done. */
+    NRFX_QSPI_EVENT_ERASE_DONE, /**< Erase done. */
+} nrfx_qspi_evt_ext_type_t;
+
+/** @brief QSPI driver erase event data. */
+typedef struct
+{
+    uint32_t             addr; /**< Erase start address. */
+    nrf_qspi_erase_len_t len;  /**< Erase length. */
+} nrfx_qspi_evt_ext_erase_t;
+
+/** @brief QSPI driver transfer event data. */
+typedef struct
+{
+    void *   p_buffer; /**< Pointer to the data buffer associated with transfer. */
+    size_t   size;     /**< Data buffer size. */
+    uint32_t addr;     /**< Transfer start address. */
+} nrfx_qspi_evt_ext_xfer_t;
+
+/** @brief QSPI driver extended event structure. */
+typedef struct
+{
+    nrfx_qspi_evt_ext_type_t type;       ///< Extended event type.
+    union
+    {
+        nrfx_qspi_evt_ext_xfer_t  xfer;  ///< Data for write or read transfer event.
+        nrfx_qspi_evt_ext_erase_t erase; ///< Data for erase event.
+    } data;                              ///< Union to store event data.
+} nrfx_qspi_evt_ext_t;
+
 /** @brief QSPI driver event handler type. */
 typedef void (*nrfx_qspi_handler_t)(nrfx_qspi_evt_t event, void * p_context);
 
@@ -147,6 +201,10 @@ typedef void (*nrfx_qspi_handler_t)(nrfx_qspi_evt_t event, void * p_context);
  *                      will be performed in blocking mode.
  * @param[in] p_context Pointer to context. Use in the interrupt handler.
  *
+ * @warning On nRF5340, only the dedicated pins with @ref NRF_GPIO_PIN_MCUSEL_PERIPHERAL configuration
+ *          are supported. See the chapter <a href=@nRF5340pinAssignmentsURL>Pin assignments</a>
+ *          in the Product Specification.
+ *
  * @retval NRFX_SUCCESS             Initialization was successful.
  * @retval NRFX_ERROR_TIMEOUT       The peripheral cannot connect with external memory.
  * @retval NRFX_ERROR_INVALID_STATE The driver was already initialized.
@@ -168,6 +226,9 @@ void nrfx_qspi_uninit(void);
  *    until the operation data is being read.
  *  - interrupt mode (with handler) - event emission occurs after the last operation
  *    and reading of data are finished.
+ * In interrupt mode read operations can be double-buffered by calling the function again.
+ * To utilize double-buffering feature, @ref NRF_QSPI_TASK_READSTART needs to be triggered
+ * on @ref NRF_QSPI_EVENT_READY externally (for example by using the PPI/DPPI).
  *
  * @param[out] p_rx_buffer      Pointer to the receive buffer.
  * @param[in]  rx_buffer_length Size of the data to read.
@@ -194,8 +255,11 @@ nrfx_err_t nrfx_qspi_read(void *   p_rx_buffer,
  *    and sending of operation data are finished.
  * To manually control operation execution in the memory device, use @ref nrfx_qspi_mem_busy_check
  * after executing the write function.
- * Remember that an incoming event signalizes only that data was sent to the memory device and the periheral
+ * Remember that an incoming event signalizes only that data was sent to the memory device and the peripheral
  * before the write operation checked if memory was busy.
+ * In interrupt mode write operations can be double-buffered by calling the function again.
+ * To utilize double-buffering feature, @ref NRF_QSPI_TASK_WRITESTART needs to be triggered
+ * on @ref NRF_QSPI_EVENT_READY externally (for example by using the PPI/DPPI).
  *
  * @param[in] p_tx_buffer      Pointer to the writing buffer.
  * @param[in] tx_buffer_length Size of the data to write.
@@ -247,6 +311,23 @@ nrfx_err_t nrfx_qspi_erase(nrf_qspi_erase_len_t length,
 nrfx_err_t nrfx_qspi_chip_erase(void);
 
 /**
+ * @brief Function for getting the extended event associated with finished operation.
+ *
+ * @warning This function shall be used only in the context of event handler
+            passed by the user during driver initialization.
+ *
+ * @return Pointer to the extended event associated with finished operation.
+ */
+nrfx_qspi_evt_ext_t const * nrfx_qspi_event_extended_get(void);
+
+/**
+ * @brief Function for checking whether any write or read data transfer is buffered.
+ *
+ * @return True if there is a transfer buffered, false otherwise.
+ */
+bool nrfx_qspi_xfer_buffered_check(void);
+
+/**
  * @brief Function for getting the current driver status and status byte of memory device with
  *        testing WIP (write in progress) bit.
  *
@@ -261,6 +342,13 @@ nrfx_err_t nrfx_qspi_mem_busy_check(void);
  * Use this function to transfer configuration data to memory and to receive data from memory.
  * Pointers can be addresses from flash memory.
  * This function is a synchronous function and should be used only if necessary.
+ *
+ * @note Please note that the @ref NRFX_QSPI_DEFAULT_CINSTR macro provides default values
+ *       for the @p io2_level and @p io3_level fields that cause the IO2 and IO3 lines
+ *       to be kept low during the custom instruction transfer. Such configuration may not
+ *       be suitable in certain circumstances and memory devices can interpret such levels
+ *       of those lines as active WP# and HOLD#/RESET# signals, respectively. Hence, it is
+ *       safer to use a configuration that will keep the lines high during the transfer.
  *
  * @param[in]  p_config    Pointer to the structure with opcode and transfer configuration.
  * @param[in]  p_tx_buffer Pointer to the array with data to send. Can be NULL if only opcode is transmitted.
@@ -298,6 +386,13 @@ nrfx_err_t nrfx_qspi_cinstr_quick_send(uint8_t               opcode,
  * Use this function to initiate a custom transaction by sending custom instruction opcode.
  * To send and receive data, use @ref nrfx_qspi_lfm_xfer.
  *
+ * @note Please note that the @ref NRFX_QSPI_DEFAULT_CINSTR macro provides default values
+ *       for the @p io2_level and @p io3_level fields that cause the IO2 and IO3 lines
+ *       to be kept low during the custom instruction transfer. Such configuration may not
+ *       be suitable in certain circumstances and memory devices can interpret such levels
+ *       of those lines as active WP# and HOLD#/RESET# signals, respectively. Hence, it is
+ *       safer to use a configuration that will keep the lines high during the transfer.
+ *
  * @param[in] p_config Pointer to the structure with custom instruction opcode and transfer
  *                     configuration. Transfer length must be set to @ref NRF_QSPI_CINSTR_LEN_1B.
  *
@@ -328,6 +423,32 @@ nrfx_err_t nrfx_qspi_lfm_xfer(void const * p_tx_buffer,
                               void *       p_rx_buffer,
                               size_t       transfer_length,
                               bool         finalize);
+
+#if NRF_QSPI_HAS_XIP_ENC
+/**
+ * @brief Function for setting the XIP encryption.
+ *
+ * @param[in] p_config XIP encryption configuration structure.
+ *                     To disable encryption, pass NULL pointer as argument.
+ *
+ * @retval NRFX_SUCCESS    Operation was successful.
+ * @retval NRFX_ERROR_BUSY Driver currently handles other operation.
+ */
+nrfx_err_t nrfx_qspi_xip_encrypt(nrf_qspi_encryption_t const * p_config);
+#endif
+
+#if NRF_QSPI_HAS_DMA_ENC
+/**
+ * @brief Function for setting the EasyDMA encryption.
+ *
+ * @param[in] p_config DMA encryption configuration structure.
+ *                     To disable encryption, pass NULL pointer as argument.
+ *
+ * @retval NRFX_SUCCESS    Operation was successful.
+ * @retval NRFX_ERROR_BUSY Driver currently handles other operation.
+ */
+nrfx_err_t nrfx_qspi_dma_encrypt(nrf_qspi_encryption_t const * p_config);
+#endif
 
 /** @} */
 

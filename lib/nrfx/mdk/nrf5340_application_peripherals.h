@@ -1,6 +1,8 @@
 /*
 
-Copyright (c) 2010 - 2018, Nordic Semiconductor ASA All rights reserved.
+Copyright (c) 2010 - 2022, Nordic Semiconductor ASA All rights reserved.
+
+SPDX-License-Identifier: BSD-3-Clause
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
@@ -38,6 +40,8 @@ POSSIBILITY OF SUCH DAMAGE.
 #define CLOCK_PRESENT
 #define CLOCK_COUNT 1
 
+#define CLOCK_FEATURE_HFCLK_DIVIDE_PRESENT
+
 /* Power Peripheral */
 #define POWER_PRESENT
 #define POWER_COUNT 1
@@ -58,6 +62,10 @@ POSSIBILITY OF SUCH DAMAGE.
 #define REGULATORS_COUNT 1
 
 #define REGULATORS_FEATURE_VDDH_PRESENT
+
+/* USB Regulator Peripheral */
+#define USBREG_PRESENT
+#define USBREG_COUNT 1
 
 /* Volatile Memory Controller Peripheral */
 #define VMC_PRESENT
@@ -80,14 +88,17 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #define IPC_CH_NUM 16
 #define IPC_CONF_NUM 16
-#define IPC_GPMEM_NUM 4
+#define IPC_GPMEM_NUM 2
 
 /* GPIO */
 #define GPIO_PRESENT
 #define GPIO_COUNT 2
 
 #define P0_PIN_NUM 32
-#define P1_PIN_NUM 12
+#define P1_PIN_NUM 16
+
+#define P0_FEATURE_PINS_PRESENT 0xFFFFFFFFUL
+#define P1_FEATURE_PINS_PRESENT 0x0000FFFFUL
 
 /* NFC Tag */
 #define NFCT_PRESENT
@@ -96,11 +107,11 @@ POSSIBILITY OF SUCH DAMAGE.
 #define NFCT_EASYDMA_MAXCNT_SIZE 9
 
 /* Distributed Peripheral to Peripheral Interconnect */
-#define DPPI_PRESENT
-#define DPPI_COUNT 1
+#define DPPIC_PRESENT
+#define DPPIC_COUNT 1
 
-#define DPPI_CH_NUM 32
-#define DPPI_GROUP_NUM 6
+#define DPPIC_CH_NUM 32
+#define DPPIC_GROUP_NUM 6
 
 /* Event Generator Unit */
 #define EGU_PRESENT
@@ -138,59 +149,77 @@ POSSIBILITY OF SUCH DAMAGE.
 
 /* Serial Peripheral Interface Master with DMA */
 #define SPIM_PRESENT
-#define SPIM_COUNT 3
+#define SPIM_COUNT 5
 
 #define SPIM0_MAX_DATARATE  8
 #define SPIM1_MAX_DATARATE  8
-#define SPIM2_MAX_DATARATE  32
+#define SPIM2_MAX_DATARATE  8
+#define SPIM3_MAX_DATARATE  8
+#define SPIM4_MAX_DATARATE  32
 
 #define SPIM0_FEATURE_HARDWARE_CSN_PRESENT  0
 #define SPIM1_FEATURE_HARDWARE_CSN_PRESENT  0
-#define SPIM2_FEATURE_HARDWARE_CSN_PRESENT  1
+#define SPIM2_FEATURE_HARDWARE_CSN_PRESENT  0
+#define SPIM3_FEATURE_HARDWARE_CSN_PRESENT  0
+#define SPIM4_FEATURE_HARDWARE_CSN_PRESENT  1
 
 #define SPIM0_FEATURE_DCX_PRESENT  0
 #define SPIM1_FEATURE_DCX_PRESENT  0
-#define SPIM2_FEATURE_DCX_PRESENT  1
+#define SPIM2_FEATURE_DCX_PRESENT  0
+#define SPIM3_FEATURE_DCX_PRESENT  0
+#define SPIM4_FEATURE_DCX_PRESENT  1
 
 #define SPIM0_FEATURE_RXDELAY_PRESENT  0
 #define SPIM1_FEATURE_RXDELAY_PRESENT  0
-#define SPIM2_FEATURE_RXDELAY_PRESENT  1
+#define SPIM2_FEATURE_RXDELAY_PRESENT  0
+#define SPIM3_FEATURE_RXDELAY_PRESENT  0
+#define SPIM4_FEATURE_RXDELAY_PRESENT  1
 
 #define SPIM0_EASYDMA_MAXCNT_SIZE 16
 #define SPIM1_EASYDMA_MAXCNT_SIZE 16
 #define SPIM2_EASYDMA_MAXCNT_SIZE 16
+#define SPIM3_EASYDMA_MAXCNT_SIZE 16
+#define SPIM4_EASYDMA_MAXCNT_SIZE 16
 
 /* Serial Peripheral Interface Slave with DMA*/
 #define SPIS_PRESENT
-#define SPIS_COUNT 2
+#define SPIS_COUNT 4
 
 #define SPIS0_EASYDMA_MAXCNT_SIZE 16
 #define SPIS1_EASYDMA_MAXCNT_SIZE 16
+#define SPIS2_EASYDMA_MAXCNT_SIZE 16
+#define SPIS3_EASYDMA_MAXCNT_SIZE 16
 
 /* Two Wire Interface Master with DMA */
 #define TWIM_PRESENT
-#define TWIM_COUNT 2
+#define TWIM_COUNT 4
 
 #define TWIM0_EASYDMA_MAXCNT_SIZE 16
 #define TWIM1_EASYDMA_MAXCNT_SIZE 16
+#define TWIM2_EASYDMA_MAXCNT_SIZE 16
+#define TWIM3_EASYDMA_MAXCNT_SIZE 16
 
 /* Two Wire Interface Slave with DMA */
 #define TWIS_PRESENT
-#define TWIS_COUNT 2
+#define TWIS_COUNT 4
 
 #define TWIS0_EASYDMA_MAXCNT_SIZE 16
 #define TWIS1_EASYDMA_MAXCNT_SIZE 16
+#define TWIS2_EASYDMA_MAXCNT_SIZE 16
+#define TWIS3_EASYDMA_MAXCNT_SIZE 16
 
 /* Universal Asynchronous Receiver-Transmitter with DMA */
 #define UARTE_PRESENT
-#define UARTE_COUNT 2
+#define UARTE_COUNT 4
 
 #define UARTE0_EASYDMA_MAXCNT_SIZE 16
 #define UARTE1_EASYDMA_MAXCNT_SIZE 16
+#define UARTE2_EASYDMA_MAXCNT_SIZE 16
+#define UARTE3_EASYDMA_MAXCNT_SIZE 16
 
 /* Quadrature Decoder */
 #define QDEC_PRESENT
-#define QDEC_COUNT 1
+#define QDEC_COUNT 2
 
 /* Successive Approximation Analog to Digital Converter */
 #define SAADC_PRESENT
@@ -222,15 +251,17 @@ POSSIBILITY OF SUCH DAMAGE.
 
 /* Pulse Width Modulator */
 #define PWM_PRESENT
-#define PWM_COUNT 3
+#define PWM_COUNT 4
 
 #define PWM0_CH_NUM 4
 #define PWM1_CH_NUM 4
 #define PWM2_CH_NUM 4
+#define PWM3_CH_NUM 4
 
 #define PWM0_EASYDMA_MAXCNT_SIZE 15
 #define PWM1_EASYDMA_MAXCNT_SIZE 15
 #define PWM2_EASYDMA_MAXCNT_SIZE 15
+#define PWM3_EASYDMA_MAXCNT_SIZE 15
 
 /* ARM TrustZone Cryptocell 310 */
 #define CRYPTOCELL_PRESENT
@@ -258,6 +289,8 @@ POSSIBILITY OF SUCH DAMAGE.
 #define SPU_PRESENT
 #define SPU_COUNT 1
 
+#define SPU_RAMREGION_SIZE 0x2000ul
+
 /* Inter-IC Sound Interface */
 #define I2S_PRESENT
 #define I2S_COUNT 1
@@ -269,5 +302,9 @@ POSSIBILITY OF SUCH DAMAGE.
 #define USBD_COUNT 1
 
 #define USBD_EASYDMA_MAXCNT_SIZE 7
+
+/* Oscillators */
+#define OSCILLATORS_PRESENT
+#define OSCILLATORS_COUNT 1
 
 #endif      // _NRF5340_PERIPHERALS_H

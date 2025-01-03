@@ -430,7 +430,7 @@ uint32_t bootloader_dfu_sd_update_continue(void)
 
   // Ensure that flash operations are not executed within the first 100 ms seconds to allow
   // a debugger to be attached.
-  NRFX_DELAY_MS(100);
+  NRFX_DELAY_US(100);
 
   err_code = dfu_sd_image_swap();
   APP_ERROR_CHECK(err_code);

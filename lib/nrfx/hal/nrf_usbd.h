@@ -1,6 +1,8 @@
 /*
- * Copyright (c) 2017 - 2019, Nordic Semiconductor ASA
+ * Copyright (c) 2017 - 2022, Nordic Semiconductor ASA
  * All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -1086,15 +1088,6 @@ NRF_STATIC_INLINE uint32_t nrf_usbd_ep_amount_get(NRF_USBD_Type const * p_reg, u
 
 NRF_STATIC_INLINE void nrf_usbd_enable(NRF_USBD_Type * p_reg)
 {
-#ifdef NRF_FPGA_IMPLEMENTATION
-    *(volatile uint32_t *)0x400005F4 = 3;
-    __ISB();
-    __DSB();
-    *(volatile uint32_t *)0x400005F0 = 3;
-    __ISB();
-    __DSB();
-#endif
-
     p_reg->ENABLE = USBD_ENABLE_ENABLE_Enabled << USBD_ENABLE_ENABLE_Pos;
     (void) p_reg->ENABLE;
 }

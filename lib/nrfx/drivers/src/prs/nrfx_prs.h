@@ -1,6 +1,8 @@
 /*
- * Copyright (c) 2017 - 2019, Nordic Semiconductor ASA
+ * Copyright (c) 2017 - 2022, Nordic Semiconductor ASA
  * All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -51,7 +53,7 @@ extern "C" {
     #define NRFX_PRS_BOX_0_ADDR     NRF_SPI0
     // SPI1, SPIS1, TWI1
     #define NRFX_PRS_BOX_1_ADDR     NRF_SPI1
-#elif defined(NRF52810_XXAA)
+#elif defined(NRF52805_XXAA) || defined(NRF52810_XXAA)
     // TWIM0, TWIS0, TWI0
     #define NRFX_PRS_BOX_0_ADDR     NRF_TWIM0
     // SPIM0, SPIS0, SPI0
@@ -65,6 +67,13 @@ extern "C" {
     #define NRFX_PRS_BOX_1_ADDR     NRF_SPIM0
     // UART0, UARTE0
     #define NRFX_PRS_BOX_2_ADDR     NRF_UART0
+#elif defined(NRF52820_XXAA)
+    // SPIM0, SPIS0, TWIM0, TWIS0, SPI0, TWI0
+    #define NRFX_PRS_BOX_0_ADDR     NRF_SPIM0
+    // SPIM1, SPIS1, TWIM1, TWIS1, SPI1, TWI1
+    #define NRFX_PRS_BOX_1_ADDR     NRF_SPIM1
+    // UARTE0, UART0
+    #define NRFX_PRS_BOX_2_ADDR     NRF_UARTE0
 #elif defined(NRF52832_XXAA) || defined(NRF52832_XXAB) || \
       defined(NRF52833_XXAA) || defined(NRF52840_XXAA)
     // SPIM0, SPIS0, TWIM0, TWIS0, SPI0, TWI0
@@ -82,8 +91,12 @@ extern "C" {
     #define NRFX_PRS_BOX_0_ADDR     NRF_UARTE0
     // SPIM1, SPIS1, TWIM1, TWIS1, UARTE1
     #define NRFX_PRS_BOX_1_ADDR     NRF_UARTE1
+    // SPIM2, SPIS2, TWIM2, TWIS2, UARTE2
+    #define NRFX_PRS_BOX_2_ADDR     NRF_UARTE2
+    // SPIM3, SPIS3, TWIM3, TWIS3, UARTE3
+    #define NRFX_PRS_BOX_3_ADDR     NRF_UARTE3
     // COMP, LPCOMP
-    #define NRFX_PRS_BOX_2_ADDR     NRF_COMP
+    #define NRFX_PRS_BOX_4_ADDR     NRF_COMP
 #elif defined(NRF5340_XXAA_NETWORK)
     // SPIM0, SPIS0, TWIM0, TWIS0, UARTE0
     #define NRFX_PRS_BOX_0_ADDR     NRF_UARTE0

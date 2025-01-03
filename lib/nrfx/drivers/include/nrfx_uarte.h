@@ -1,6 +1,8 @@
 /*
- * Copyright (c) 2015 - 2019, Nordic Semiconductor ASA
+ * Copyright (c) 2015 - 2022, Nordic Semiconductor ASA
  * All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -97,6 +99,20 @@ typedef struct
     nrf_uarte_baudrate_t baudrate;           ///< Baud rate.
     uint8_t              interrupt_priority; ///< Interrupt priority.
     nrf_uarte_config_t   hal_cfg;            ///< Parity, flow control and stop bits settings.
+    bool                 skip_gpio_cfg;      ///< Skip GPIO configuration of pins.
+                                             /**< When set to true, the driver does not modify
+                                              *   any GPIO parameters of the used pins. Those
+                                              *   parameters are supposed to be configured
+                                              *   externally before the driver is initialized. */
+    bool                 skip_psel_cfg;      ///< Skip pin selection configuration.
+                                             /**< When set to true, the driver does not modify
+                                              *   pin select registers in the peripheral.
+                                              *   Those registers are supposed to be set up
+                                              *   externally before the driver is initialized.
+                                              *   @note When both GPIO configuration and pin
+                                              *   selection are to be skipped, the structure
+                                              *   fields that specify pins can be omitted,
+                                              *   as they are ignored anyway. */
 } nrfx_uarte_config_t;
 
 #if defined(UARTE_CONFIG_STOP_Msk) || defined(__NRFX_DOXYGEN__)
@@ -296,6 +312,15 @@ void nrfx_uarte_tx_abort(nrfx_uarte_t const * p_instance);
  *       to be placed in the Data RAM region. If this condition is not met,
  *       this function fails with the error code NRFX_ERROR_INVALID_ADDR.
  *
+ * @warning When the double-buffering feature is used and the UARTE interrupt
+ *          is processed with a delay (for example, due to a higher priority interrupt)
+ *          long enough for both buffers to get filled completely,
+ *          the event handler will be invoked only once, to notify that
+ *          the first buffer has been filled. This is because from hardware perspective it
+ *          is impossible to deduce in such case if the second buffer was also filled completely or not.
+ *          To prevent this from happening, keep the UARTE interrupt latency low
+ *          or use large enough reception buffers.
+ *
  * @param[in] p_instance Pointer to the driver instance structure.
  * @param[in] p_data     Pointer to data.
  * @param[in] length     Number of bytes to receive. Maximum possible length is
@@ -334,6 +359,16 @@ bool nrfx_uarte_rx_ready(nrfx_uarte_t const * p_instance);
  *       It will contain number of bytes received until the abort was called. The event
  *       handler will be called from the UARTE interrupt context.
  *
+ * @warning When the double-buffering feature is used and the UARTE interrupt
+ *          is processed with a delay (for example, due to a higher priority
+ *          interrupt) long enough for the first buffer to be filled completely,
+ *          the event handler will be supplied with the pointer to the first
+ *          buffer and the number of bytes received in the second buffer.
+ *          This is because from hardware perspective it is impossible to deduce
+ *          the reception of which buffer has been aborted.
+ *          To prevent this from happening, keep the UARTE interrupt latency low
+ *          or use large enough reception buffers.
+ *
  * @param[in] p_instance Pointer to the driver instance structure.
  */
 void nrfx_uarte_rx_abort(nrfx_uarte_t const * p_instance);
@@ -363,6 +398,15 @@ NRFX_STATIC_INLINE uint32_t nrfx_uarte_event_address_get(nrfx_uarte_t const * p_
     return nrf_uarte_event_address_get(p_instance->p_reg, event);
 }
 #endif // NRFX_DECLARE_ONLY
+
+/**
+ * @brief Macro returning UARTE interrupt handler.
+ *
+ * param[in] idx UARTE index.
+ *
+ * @return Interrupt handler.
+ */
+#define NRFX_UARTE_INST_HANDLER_GET(idx) NRFX_CONCAT_3(nrfx_uarte_, idx, _irq_handler)
 
 /** @} */
 

@@ -1,6 +1,8 @@
 /*
- * Copyright (c) 2015 - 2019, Nordic Semiconductor ASA
+ * Copyright (c) 2015 - 2022, Nordic Semiconductor ASA
  * All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -86,27 +88,47 @@ enum {
 /** @brief Configuration structure of the SPI master driver instance. */
 typedef struct
 {
-    uint8_t sck_pin;                ///< SCK pin number.
-    uint8_t mosi_pin;               ///< MOSI pin number (optional).
-                                    /**< Set to @ref NRFX_SPI_PIN_NOT_USED
-                                     *   if this signal is not needed. */
-    uint8_t miso_pin;               ///< MISO pin number (optional).
-                                    /**< Set to @ref NRFX_SPI_PIN_NOT_USED
-                                     *   if this signal is not needed. */
-    uint8_t ss_pin;                 ///< Slave Select pin number (optional).
-                                    /**< Set to @ref NRFX_SPI_PIN_NOT_USED
-                                     *   if this signal is not needed. The driver
-                                     *   supports only active low for this signal.
-                                     *   If the signal must be active high,
-                                     *   it must be controlled externally. */
-    uint8_t irq_priority;           ///< Interrupt priority.
-    uint8_t orc;                    ///< Overrun character.
-                                    /**< This character is used when all bytes from the TX buffer are sent,
-                                         but the transfer continues due to RX. */
-    nrf_spi_frequency_t frequency;  ///< SPI frequency.
-    nrf_spi_mode_t      mode;       ///< SPI mode.
-    nrf_spi_bit_order_t bit_order;  ///< SPI bit order.
-    nrf_gpio_pin_pull_t miso_pull;  ///< MISO pull up configuration.
+    uint8_t             sck_pin;       ///< SCK pin number.
+    uint8_t             mosi_pin;      ///< MOSI pin number (optional).
+                                       /**< Set to @ref NRFX_SPI_PIN_NOT_USED
+                                        *   if this signal is not needed. */
+    uint8_t             miso_pin;      ///< MISO pin number (optional).
+                                       /**< Set to @ref NRFX_SPI_PIN_NOT_USED
+                                        *   if this signal is not needed. */
+    uint8_t             ss_pin;        ///< Slave Select pin number (optional).
+                                       /**< Set to @ref NRFX_SPI_PIN_NOT_USED
+                                        *   if this signal is not needed. The driver
+                                        *   supports only active low for this signal.
+                                        *   If the signal must be active high,
+                                        *   it must be controlled externally.
+                                        *   @note Unlike the other fields that specify
+                                        *   pin numbers, this one cannot be omitted
+                                        *   when both GPIO configuration and pin
+                                        *   selection are to be skipped, as the driver
+                                        *   must control the signal as a regular GPIO. */
+    uint8_t             irq_priority;  ///< Interrupt priority.
+    uint8_t             orc;           ///< Overrun character.
+                                       /**< This character is used when all bytes from the TX buffer are sent,
+                                        *   but the transfer continues due to RX. */
+    nrf_spi_frequency_t frequency;     ///< SPI frequency.
+    nrf_spi_mode_t      mode;          ///< SPI mode.
+    nrf_spi_bit_order_t bit_order;     ///< SPI bit order.
+    nrf_gpio_pin_pull_t miso_pull;     ///< MISO pull up configuration.
+    bool                skip_gpio_cfg; ///< Skip GPIO configuration of pins.
+                                       /**< When set to true, the driver does not modify
+                                        *   any GPIO parameters of the used pins. Those
+                                        *   parameters are supposed to be configured
+                                        *   externally before the driver is initialized. */
+    bool                skip_psel_cfg; ///< Skip pin selection configuration.
+                                       /**< When set to true, the driver does not modify
+                                        *   pin select registers in the peripheral.
+                                        *   Those registers are supposed to be set up
+                                        *   externally before the driver is initialized.
+                                        *   @note When both GPIO configuration and pin
+                                        *   selection are to be skipped, the structure
+                                        *   fields that specify pins can be omitted,
+                                        *   as they are ignored anyway. This does not
+                                        *   apply to the @p ss_pin field. */
 } nrfx_spi_config_t;
 
 /**
@@ -116,6 +138,7 @@ typedef struct
  * - clock frequency 4 MHz
  * - mode 0 enabled (SCK active high, sample on leading edge of clock)
  * - MSB shifted out first
+ * - MISO pull-up disabled
  *
  * @param[in] _pin_sck  SCK pin.
  * @param[in] _pin_mosi MOSI pin.
@@ -133,6 +156,7 @@ typedef struct
     .frequency    = NRF_SPI_FREQ_4M,                                        \
     .mode         = NRF_SPI_MODE_0,                                         \
     .bit_order    = NRF_SPI_BIT_ORDER_MSB_FIRST,                            \
+    .miso_pull    = NRF_GPIO_PIN_NOPULL,                                    \
 }
 
 /** @brief Single transfer descriptor structure. */
@@ -246,6 +270,15 @@ nrfx_err_t nrfx_spi_xfer(nrfx_spi_t const *           p_instance,
  * @param[in] p_instance Pointer to the driver instance structure.
  */
 void nrfx_spi_abort(nrfx_spi_t const * p_instance);
+
+/**
+ * @brief Macro returning SPI interrupt handler.
+ *
+ * param[in] idx SPI index.
+ *
+ * @return Interrupt handler.
+ */
+#define NRFX_SPI_INST_HANDLER_GET(idx) NRFX_CONCAT_3(nrfx_spi_, idx, _irq_handler)
 
 /** @} */
 

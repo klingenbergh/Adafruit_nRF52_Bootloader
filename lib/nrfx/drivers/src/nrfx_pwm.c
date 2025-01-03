@@ -1,6 +1,8 @@
 /*
- * Copyright (c) 2015 - 2019, Nordic Semiconductor ASA
+ * Copyright (c) 2015 - 2022, Nordic Semiconductor ASA
  * All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -75,12 +77,20 @@ typedef struct
     void *                    p_context;
     nrfx_drv_state_t volatile state;
     uint8_t                   flags;
+    bool                      skip_gpio_cfg;
 } pwm_control_block_t;
 static pwm_control_block_t m_cb[NRFX_PWM_ENABLED_COUNT];
 
 static void configure_pins(nrfx_pwm_t const *        p_instance,
                            nrfx_pwm_config_t const * p_config)
 {
+    // Nothing to do here if both GPIO configuration and pin selection are
+    // to be skipped (the pin numbers may be then even not specified).
+    if (p_config->skip_gpio_cfg && p_config->skip_psel_cfg)
+    {
+        return;
+    }
+
     uint32_t out_pins[NRF_PWM_CHANNEL_COUNT];
     uint8_t i;
 
@@ -92,16 +102,11 @@ static void configure_pins(nrfx_pwm_t const *        p_instance,
             bool inverted = output_pin &  NRFX_PWM_PIN_INVERTED;
             out_pins[i]   = output_pin & ~NRFX_PWM_PIN_INVERTED;
 
-            if (inverted)
+            if (!p_config->skip_gpio_cfg)
             {
-                nrf_gpio_pin_set(out_pins[i]);
+                nrf_gpio_pin_write(out_pins[i], inverted ? 1 : 0);
+                nrf_gpio_cfg_output(out_pins[i]);
             }
-            else
-            {
-                nrf_gpio_pin_clear(out_pins[i]);
-            }
-
-            nrf_gpio_cfg_output(out_pins[i]);
         }
         else
         {
@@ -109,9 +114,23 @@ static void configure_pins(nrfx_pwm_t const *        p_instance,
         }
     }
 
-    nrf_pwm_pins_set(p_instance->p_registers, out_pins);
+    if (!p_config->skip_psel_cfg)
+    {
+        nrf_pwm_pins_set(p_instance->p_registers, out_pins);
+    }
 }
 
+static void deconfigure_pins(nrfx_pwm_t const * p_instance)
+{
+    for (uint8_t ch_idx = 0; ch_idx < NRF_PWM_CHANNEL_COUNT; ch_idx++)
+    {
+        uint32_t pin = nrf_pwm_pin_get(p_instance->p_registers, ch_idx);
+        if (pin != NRF_PWM_PIN_NOT_CONNECTED)
+        {
+            nrf_gpio_cfg_default(pin);
+        }
+    }
+}
 
 nrfx_err_t nrfx_pwm_init(nrfx_pwm_t const *        p_instance,
                          nrfx_pwm_config_t const * p_config,
@@ -135,6 +154,7 @@ nrfx_err_t nrfx_pwm_init(nrfx_pwm_t const *        p_instance,
 
     p_cb->handler = handler;
     p_cb->p_context = p_context;
+    p_cb->skip_gpio_cfg = p_config->skip_gpio_cfg;
 
     configure_pins(p_instance, p_config);
 
@@ -187,6 +207,11 @@ void nrfx_pwm_uninit(nrfx_pwm_t const * p_instance)
 #endif
 
     nrf_pwm_disable(p_instance->p_registers);
+
+    if (!p_cb->skip_gpio_cfg)
+    {
+        deconfigure_pins(p_instance);
+    }
 
     p_cb->state = NRFX_DRV_STATE_UNINITIALIZED;
 }
@@ -365,14 +390,22 @@ bool nrfx_pwm_stop(nrfx_pwm_t const * p_instance,
 
     bool ret_val = false;
 
+    // Deactivate shortcuts before triggering the STOP task, otherwise the PWM
+    // could be immediately started again if the LOOPSDONE event occurred in
+    // the same peripheral clock cycle as the STOP task was triggered.
+    nrf_pwm_shorts_set(p_instance->p_registers, 0);
+
+    // Trigger the STOP task even if the PWM appears to be already stopped.
+    // It won't harm, but it could help if for some strange reason the stopped
+    // status was not reported correctly.
+    nrf_pwm_task_trigger(p_instance->p_registers, NRF_PWM_TASK_STOP);
+
     if (nrfx_pwm_is_stopped(p_instance))
     {
         ret_val = true;
     }
     else
     {
-        nrf_pwm_task_trigger(p_instance->p_registers, NRF_PWM_TASK_STOP);
-
         do {
             if (nrfx_pwm_is_stopped(p_instance))
             {

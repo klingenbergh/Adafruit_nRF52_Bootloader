@@ -1,6 +1,8 @@
 /*
- * Copyright (c) 2015 - 2019, Nordic Semiconductor ASA
+ * Copyright (c) 2015 - 2022, Nordic Semiconductor ASA
  * All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -87,6 +89,20 @@ typedef struct
     nrf_twim_frequency_t frequency;          ///< TWIM frequency.
     uint8_t              interrupt_priority; ///< Interrupt priority.
     bool                 hold_bus_uninit;    ///< Hold pull up state on GPIO pins after uninit.
+    bool                 skip_gpio_cfg;      ///< Skip GPIO configuration of pins.
+                                             /**< When set to true, the driver does not modify
+                                              *   any GPIO parameters of the used pins. Those
+                                              *   parameters are supposed to be configured
+                                              *   externally before the driver is initialized. */
+    bool                 skip_psel_cfg;      ///< Skip pin selection configuration.
+                                             /**< When set to true, the driver does not modify
+                                              *   pin select registers in the peripheral.
+                                              *   Those registers are supposed to be set up
+                                              *   externally before the driver is initialized.
+                                              *   @note When both GPIO configuration and pin
+                                              *   selection are to be skipped, the structure
+                                              *   fields that specify pins can be omitted,
+                                              *   as they are ignored anyway. */
 } nrfx_twim_config_t;
 
 /**
@@ -109,17 +125,19 @@ typedef struct
 }
 
 /** @brief Flag indicating that TX buffer address will be incremented after the transfer. */
-#define NRFX_TWIM_FLAG_TX_POSTINC          (1UL << 0)
+#define NRFX_TWIM_FLAG_TX_POSTINC             (1UL << 0)
 /** @brief Flag indicating that RX buffer address will be incremented after the transfer. */
-#define NRFX_TWIM_FLAG_RX_POSTINC          (1UL << 1)
+#define NRFX_TWIM_FLAG_RX_POSTINC             (1UL << 1)
 /** @brief Flag indicating that the interrupt after each transfer will be suppressed, and the event handler will not be called. */
-#define NRFX_TWIM_FLAG_NO_XFER_EVT_HANDLER (1UL << 2)
+#define NRFX_TWIM_FLAG_NO_XFER_EVT_HANDLER    (1UL << 2)
 /** @brief Flag indicating that the transfer will be set up, but not started. */
-#define NRFX_TWIM_FLAG_HOLD_XFER           (1UL << 3)
+#define NRFX_TWIM_FLAG_HOLD_XFER              (1UL << 3)
 /** @brief Flag indicating that the transfer will be executed multiple times. */
-#define NRFX_TWIM_FLAG_REPEATED_XFER       (1UL << 4)
+#define NRFX_TWIM_FLAG_REPEATED_XFER          (1UL << 4)
 /** @brief Flag indicating that the TX transfer will not end with a stop condition. */
-#define NRFX_TWIM_FLAG_TX_NO_STOP          (1UL << 5)
+#define NRFX_TWIM_FLAG_TX_NO_STOP             (1UL << 5)
+/** @brief Flag indicating that checks for spurious STOP condition will not be performed. */
+#define NRFX_TWIM_FLAG_NO_SPURIOUS_STOP_CHECK (1UL << 6)
 
 /** @brief TWI master driver event types. */
 typedef enum
@@ -215,8 +233,12 @@ typedef void (* nrfx_twim_evt_handler_t)(nrfx_twim_evt_t const * p_event,
  * @param[in] event_handler Event handler provided by the user. If NULL, blocking mode is enabled.
  * @param[in] p_context     Context passed to event handler.
  *
+ * @warning On nRF5340, 1 MHz setting is supported only on the dedicated pins. See the chapter
+ *          <a href=@nRF5340pinAssignmentsURL>Pin assignments</a> in the Product Specification.
+ *
  * @retval NRFX_SUCCESS             Initialization was successful.
  * @retval NRFX_ERROR_INVALID_STATE The driver is in invalid state.
+ * @retval NRFX_ERROR_INVALID_PARAM Requested frequency is not available on the specified pins.
  * @retval NRFX_ERROR_BUSY          Some other peripheral with the same
  *                                  instance ID is already in use. This is
  *                                  possible only if @ref nrfx_prs module
@@ -272,6 +294,10 @@ void nrfx_twim_disable(nrfx_twim_t const * p_instance);
  *   the driver does not set the driver instance into busy state, so you must ensure that the next transfers are set up
  *   when TWIM is not active.
  * - @ref NRFX_TWIM_FLAG_TX_NO_STOP - No stop condition after the TX transfer.
+ * - @ref NRFX_TWIM_FLAG_NO_SPURIOUS_STOP_CHECK - Checks for spurious STOP conditions are disabled.
+ *        Used together with @ref NRFX_TWIM_FLAG_NO_XFER_EVT_HANDLER can result in lower power consumption
+ *        when transfers are triggered externally and CPU is sleeping.
+ *        Use only with I2C standard-compliant slave devices.
  *
  * @note
  * Some flag combinations are invalid:
@@ -362,6 +388,15 @@ NRFX_STATIC_INLINE nrfx_err_t nrfx_twim_bus_recover(uint32_t scl_pin, uint32_t s
     return nrfx_twi_twim_bus_recover(scl_pin, sda_pin);
 }
 #endif
+
+/**
+ * @brief Macro returning TWIM interrupt handler.
+ *
+ * param[in] idx TWIM index.
+ *
+ * @return Interrupt handler.
+ */
+#define NRFX_TWIM_INST_HANDLER_GET(idx) NRFX_CONCAT_3(nrfx_twim_, idx, _irq_handler)
 
 /** @} */
 

@@ -1,6 +1,8 @@
 /*
- * Copyright (c) 2019, Nordic Semiconductor ASA
+ * Copyright (c) 2019 - 2022, Nordic Semiconductor ASA
  * All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -101,8 +103,7 @@ NRF_STATIC_INLINE void nrf_cache_erase_status_clear(NRF_CACHE_Type * p_reg);
  * @brief Function for setting the cache profiling.
  *
  * @param[in] p_reg  Pointer to the structure of registers of the peripheral.
- * @param[in] enable True if cache profiling is to be enabled.
- *                   False if otherwise.
+ * @param[in] enable True if cache profiling is to be enabled, false otherwise.
  */
 NRF_STATIC_INLINE void nrf_cache_profiling_set(NRF_CACHE_Type * p_reg, bool enable);
 
@@ -184,8 +185,7 @@ NRF_STATIC_INLINE uint32_t nrf_cache_data_miss_counter_get(NRF_CACHE_Type const 
  * @note -Disabling the RAM mode causes the cache to be invalidated.
  *
  * @param[in] p_reg  Pointer to the structure of registers of the peripheral.
- * @param[in] enable True if the cache RAM mode is to be enabled.
- *                   False if otherwise.
+ * @param[in] enable True if the cache RAM mode is to be enabled, false otherwise.
  */
 NRF_STATIC_INLINE void nrf_cache_ram_mode_set(NRF_CACHE_Type * p_reg, bool enable);
 
@@ -210,8 +210,7 @@ NRF_STATIC_INLINE void nrf_cache_read_lock_enable(NRF_CACHE_Type * p_reg);
  * @note Blocking is ignored in the RAM mode.
  *
  * @param[in] p_reg  Pointer to the structure of registers of the peripheral.
- * @param[in] enable True if cache content update lock is to be enabled.
- *                   False if otherwise.
+ * @param[in] enable True if cache content update lock is to be enabled, false otherwise.
  */
 NRF_STATIC_INLINE void nrf_cache_update_lock_set(NRF_CACHE_Type * p_reg, bool enable);
 

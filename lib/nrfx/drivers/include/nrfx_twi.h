@@ -1,6 +1,8 @@
 /*
- * Copyright (c) 2015 - 2019, Nordic Semiconductor ASA
+ * Copyright (c) 2015 - 2022, Nordic Semiconductor ASA
  * All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -83,6 +85,20 @@ typedef struct
     nrf_twi_frequency_t frequency;          ///< TWI frequency.
     uint8_t             interrupt_priority; ///< Interrupt priority.
     bool                hold_bus_uninit;    ///< Hold pull up state on GPIO pins after uninit.
+    bool                skip_gpio_cfg;      ///< Skip GPIO configuration of pins.
+                                            /**< When set to true, the driver does not modify
+                                             *   any GPIO parameters of the used pins. Those
+                                             *   parameters are supposed to be configured
+                                             *   externally before the driver is initialized. */
+    bool                skip_psel_cfg;      ///< Skip pin selection configuration.
+                                            /**< When set to true, the driver does not modify
+                                             *   pin select registers in the peripheral.
+                                             *   Those registers are supposed to be set up
+                                             *   externally before the driver is initialized.
+                                             *   @note When both GPIO configuration and pin
+                                             *   selection are to be skipped, the structure
+                                             *   fields that specify pins can be omitted,
+                                             *   as they are ignored anyway. */
 } nrfx_twi_config_t;
 
 /**
@@ -117,7 +133,8 @@ typedef enum
     NRFX_TWI_EVT_DONE,         ///< Transfer completed event.
     NRFX_TWI_EVT_ADDRESS_NACK, ///< Error event: NACK received after sending the address.
     NRFX_TWI_EVT_DATA_NACK,    ///< Error event: NACK received after sending a data byte.
-    NRFX_TWI_EVT_OVERRUN       ///< Error event: The unread data is replaced by new data.
+    NRFX_TWI_EVT_OVERRUN,      ///< Error event: The unread data is replaced by new data.
+    NRFX_TWI_EVT_BUS_ERROR     ///< Error event: An unexpected transition occurred on the bus.
 } nrfx_twi_evt_type_t;
 
 /** @brief TWI master driver transfer types. */
@@ -265,7 +282,7 @@ void nrfx_twi_disable(nrfx_twi_t const * p_instance);
  * @retval NRFX_SUCCESS                   The procedure is successful.
  * @retval NRFX_ERROR_BUSY                The driver is not ready for a new transfer.
  * @retval NRFX_ERROR_NOT_SUPPORTED       The provided parameters are not supported.
- * @retval NRFX_ERROR_INTERNAL            An error is detected by hardware.
+ * @retval NRFX_ERROR_INTERNAL            An unexpected transition occurred on the bus.
  * @retval NRFX_ERROR_INVALID_STATE       Other direction of transaction is suspended on the bus.
  * @retval NRFX_ERROR_DRV_TWI_ERR_OVERRUN The unread data is replaced by new data (TXRX and RX)
  * @retval NRFX_ERROR_DRV_TWI_ERR_ANACK   Negative acknowledgement (NACK) is received after sending
@@ -331,6 +348,15 @@ NRFX_STATIC_INLINE nrfx_err_t nrfx_twi_bus_recover(uint32_t scl_pin, uint32_t sd
     return nrfx_twi_twim_bus_recover(scl_pin, sda_pin);
 }
 #endif
+
+/**
+ * @brief Macro returning TWI interrupt handler.
+ *
+ * param[in] idx TWI index.
+ *
+ * @return Interrupt handler.
+ */
+#define NRFX_TWI_INST_HANDLER_GET(idx) NRFX_CONCAT_3(nrfx_twi_, idx, _irq_handler)
 
 /** @} */
 

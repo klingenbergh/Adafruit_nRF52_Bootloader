@@ -1,6 +1,8 @@
 /*
- * Copyright (c) 2017 - 2019, Nordic Semiconductor ASA
+ * Copyright (c) 2017 - 2022, Nordic Semiconductor ASA
  * All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -79,6 +81,24 @@ extern "C" {
 #define NRFX_CHECK(module_enabled)  (module_enabled)
 
 /**
+ * @brief Macro for creating unsigned integer with bit position @p x set.
+ *
+ * @param[in] x Bit position to be set.
+ *
+ * @return Unsigned integer with requested bit position set.
+ */
+#define NRFX_BIT(x) (1UL << (x))
+
+/**
+ * @brief Macro for returning bit mask or 0 if @p x is 0.
+ *
+ * @param[in] x Bit mask size. Bit mask has bits 0 through x-1 (inclusive) set.
+ *
+ * @return Bit mask.
+ */
+#define NRFX_BIT_MASK(x) (NRFX_BIT(x) - 1UL)
+
+/**
  * @brief Macro for concatenating two tokens in macro expansion.
  *
  * @note This macro is expanded in two steps so that tokens given as macros
@@ -120,6 +140,35 @@ extern "C" {
 #define NRFX_CONCAT_3_(p1, p2, p3)  p1 ## p2 ## p3
 
 /**
+ * @brief Macro for computing the absolute value of an integer number.
+ *
+ * @param[in] a Input value.
+ *
+ * @return Absolute value.
+ */
+#define NRFX_ABS(a) ((a) < (0) ? -(a) : (a))
+
+/**
+ * @brief Macro for getting the smaller value between two arguments.
+ *
+ * @param[in] a First argument.
+ * @param[in] b Second argument.
+ *
+ * @return Smaller value between two arguments.
+ */
+#define NRFX_MIN(a, b) ((a) < (b) ? (a) : (b))
+
+/**
+ * @brief Macro for getting the larger value between two arguments.
+ *
+ * @param[in] a First argument.
+ * @param[in] b Second argument.
+ *
+ * @return Larger value between two arguments.
+ */
+#define NRFX_MAX(a, b) ((a) > (b) ? (a) : (b))
+
+/**
  * @brief Macro for performing rounded integer division (as opposed to
  *        truncating the result).
  *
@@ -128,7 +177,8 @@ extern "C" {
  *
  * @return Rounded (integer) result of dividing @c a by @c b.
  */
-#define NRFX_ROUNDED_DIV(a, b)  (((a) + ((b) / 2)) / (b))
+#define NRFX_ROUNDED_DIV(a, b) \
+    ((((a) < 0) ^ ((b) < 0)) ? (((a) - (b) / 2) / (b)) : (((a) + (b) / 2) / (b)))
 
 /**
  * @brief Macro for performing integer division, making sure the result is rounded up.
@@ -163,7 +213,8 @@ extern "C" {
  */
 #define NRFX_OFFSETOF(type, member)  ((size_t)&(((type *)0)->member))
 
-/**@brief Macro for checking if given lengths of EasyDMA transfers do not exceed
+/**
+ * @brief Macro for checking if given lengths of EasyDMA transfers do not exceed
  *        the limit of the specified peripheral.
  *
  * @param[in] peripheral Peripheral to check the lengths against.

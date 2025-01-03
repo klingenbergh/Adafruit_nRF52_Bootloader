@@ -1,6 +1,8 @@
 /*
- * Copyright (c) 2015 - 2019, Nordic Semiconductor ASA
+ * Copyright (c) 2015 - 2022, Nordic Semiconductor ASA
  * All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -66,7 +68,10 @@ typedef enum
     NRF_SAADC_INPUT_AIN5     = SAADC_CH_PSELP_PSELP_AnalogInput5, ///< Analog input 5 (AIN5).
     NRF_SAADC_INPUT_AIN6     = SAADC_CH_PSELP_PSELP_AnalogInput6, ///< Analog input 6 (AIN6).
     NRF_SAADC_INPUT_AIN7     = SAADC_CH_PSELP_PSELP_AnalogInput7, ///< Analog input 7 (AIN7).
-    NRF_SAADC_INPUT_VDD      = SAADC_CH_PSELP_PSELP_VDD           ///< VDD as input.
+    NRF_SAADC_INPUT_VDD      = SAADC_CH_PSELP_PSELP_VDD,          ///< VDD as input.
+#if defined(SAADC_CH_PSELP_PSELP_VDDHDIV5) || defined(__NRFX_DOXYGEN__)
+    NRF_SAADC_INPUT_VDDHDIV5 = SAADC_CH_PSELP_PSELP_VDDHDIV5      ///< VDDH/5 as input.
+#endif
 } nrf_saadc_input_t;
 
 /** @brief Analog-to-digital converter oversampling mode. */
@@ -254,7 +259,7 @@ NRF_STATIC_INLINE uint32_t nrf_saadc_task_address_get(NRF_SAADC_Type const * p_r
                                                       nrf_saadc_task_t       task);
 
 /**
- * @brief Function for retrieving the state of the UARTE event.
+ * @brief Function for retrieving the state of the SAADC event.
  *
  * @param[in] p_reg Pointer to the structure of registers of the peripheral.
  * @param[in] event Event to be checked.
@@ -378,6 +383,14 @@ NRF_STATIC_INLINE void nrf_saadc_channel_limits_set(NRF_SAADC_Type * p_reg,
                                                     uint8_t          channel,
                                                     int16_t          low,
                                                     int16_t          high);
+
+/**
+ * @brief Function for setting the configuration of SAADC interrupts.
+ *
+ * @param[in] p_reg Pointer to the structure of registers of the peripheral.
+ * @param[in] mask  Interrupts configuration to be set.
+ */
+NRF_STATIC_INLINE void nrf_saadc_int_set(NRF_SAADC_Type * p_reg, uint32_t mask);
 
 /**
  * @brief Function for enabling specified SAADC interrupts.
@@ -639,10 +652,7 @@ NRF_STATIC_INLINE bool nrf_saadc_event_check(NRF_SAADC_Type const * p_reg, nrf_s
 NRF_STATIC_INLINE void nrf_saadc_event_clear(NRF_SAADC_Type * p_reg, nrf_saadc_event_t event)
 {
     *((volatile uint32_t *)((uint8_t *)p_reg + (uint32_t)event)) = 0x0UL;
-#if __CORTEX_M == 0x04
-    volatile uint32_t dummy = *((volatile uint32_t *)((uint8_t *)p_reg + (uint32_t)event));
-    (void)dummy;
-#endif
+    nrf_event_readback((uint8_t *)p_reg + (uint32_t)event);
 }
 
 NRF_STATIC_INLINE uint32_t  nrf_saadc_event_address_get(NRF_SAADC_Type const * p_reg,
@@ -716,6 +726,11 @@ NRF_STATIC_INLINE void nrf_saadc_channel_limits_set(NRF_SAADC_Type * p_reg,
     p_reg->CH[channel].LIMIT = (
             (((uint32_t) low << SAADC_CH_LIMIT_LOW_Pos) & SAADC_CH_LIMIT_LOW_Msk)
           | (((uint32_t) high << SAADC_CH_LIMIT_HIGH_Pos) & SAADC_CH_LIMIT_HIGH_Msk));
+}
+
+NRF_STATIC_INLINE void nrf_saadc_int_set(NRF_SAADC_Type * p_reg, uint32_t mask)
+{
+    p_reg->INTEN = mask;
 }
 
 NRF_STATIC_INLINE void nrf_saadc_int_enable(NRF_SAADC_Type * p_reg, uint32_t mask)

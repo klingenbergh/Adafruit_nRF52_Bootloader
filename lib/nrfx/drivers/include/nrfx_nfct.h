@@ -1,6 +1,8 @@
 /*
- * Copyright (c) 2018 - 2019, Nordic Semiconductor ASA
+ * Copyright (c) 2018 - 2022, Nordic Semiconductor ASA
  * All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -99,6 +101,7 @@ typedef enum
 typedef enum
 {
     NRFX_NFCT_PARAM_ID_FDT,     ///< NFC-A Frame Delay Time parameter.
+    NRFX_NFCT_PARAM_ID_FDT_MIN, ///< NFC-A Frame Delay Time Min parameter.
     NRFX_NFCT_PARAM_ID_SEL_RES, ///< Value of the 'Protocol' field in the NFC-A SEL_RES frame.
     NRFX_NFCT_PARAM_ID_NFCID1,  ///< NFC-A NFCID1 setting (NFC tag identifier).
 } nrfx_nfct_param_id_t;
@@ -117,6 +120,7 @@ typedef struct
     union
     {
         uint32_t           fdt;              ///< NFC-A Frame Delay Time. Filled when nrfx_nfct_param_t.id is @ref NRFX_NFCT_PARAM_ID_FDT.
+        uint32_t           fdt_min;          ///< NFC-A Frame Delay Time Min. Filled when nrfx_nfct_param_t.id is @ref NRFX_NFCT_PARAM_ID_FDT_MIN.
         uint8_t            sel_res_protocol; ///< NFC-A value of the 'Protocol' field in the SEL_RES frame. Filled when nrfx_nfct_param_t.id is @ref NRFX_NFCT_PARAM_ID_SEL_RES.
         nrfx_nfct_nfcid1_t nfcid1;           ///< NFC-A NFCID1 value (tag identifier). Filled when nrfx_nfct_param_t.id is @ref NRFX_NFCT_PARAM_ID_NFCID1.
     } data;                                  ///< Union to store parameter data.
@@ -164,6 +168,9 @@ typedef struct
  * @brief Callback descriptor to pass events from the NFCT driver to the upper layer.
  *
  * @param[in] p_event Pointer to the event descriptor.
+ *
+ * @note @ref NRFX_NFCT_EVT_FIELD_DETECTED and @ref NRFX_NFCT_EVT_FIELD_LOST are generated only on field state transitions,
+ *       i.e. there will be no multiple events of the same type (out of the 2 mentioned) coming in a row.
  */
 typedef void (*nrfx_nfct_handler_t)(nrfx_nfct_evt_t const * p_event);
 
@@ -229,9 +236,24 @@ void nrfx_nfct_rx(nrfx_nfct_data_desc_t const * p_rx_data);
  *
  * @retval NRFX_SUCCESS              The operation was successful.
  * @retval NRFX_ERROR_INVALID_LENGTH The TX buffer size is invalid.
+ * @retval NRFX_ERROR_BUSY           Driver is already transferring.
  */
 nrfx_err_t nrfx_nfct_tx(nrfx_nfct_data_desc_t const * p_tx_data,
                         nrf_nfct_frame_delay_mode_t   delay_mode);
+
+/**
+ * @brief Function for transmitting an NFC frame with a specified number of bits.
+ *
+ * @param[in] p_tx_data   Pointer to the TX buffer. Unlike in @ref nrfx_nfct_tx, @p data_size is
+ *                        used as the number of bits to transmit, rather than bytes.
+ * @param[in] delay_mode  Delay mode of the NFCT frame timer.
+ *
+ * @retval NRFX_SUCCESS              The operation was successful.
+ * @retval NRFX_ERROR_INVALID_LENGTH The TX buffer size is invalid.
+ * @retval NRFX_ERROR_BUSY           Driver is already transferring.
+ */
+nrfx_err_t nrfx_nfct_bits_tx(nrfx_nfct_data_desc_t const * p_tx_data,
+                             nrf_nfct_frame_delay_mode_t   delay_mode);
 
 /**
  * @brief Function for moving the NFCT to a new state.
@@ -264,6 +286,9 @@ nrfx_err_t nrfx_nfct_parameter_set(nrfx_nfct_param_t const * p_param);
 
 /**
  * @brief Function for getting default bytes for NFCID1.
+ *
+ * @note This function cannot be used from the non-secure code because it requires access
+ *       to FICR registers.
  *
  * @param[in,out] p_nfcid1_buff    In:  empty buffer for data;
  *                                 Out: buffer with the NFCID1 default data. These values

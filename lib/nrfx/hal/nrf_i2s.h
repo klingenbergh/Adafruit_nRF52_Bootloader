@@ -1,6 +1,8 @@
 /*
- * Copyright (c) 2015 - 2019, Nordic Semiconductor ASA
+ * Copyright (c) 2015 - 2022, Nordic Semiconductor ASA
  * All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -38,12 +40,23 @@
 extern "C" {
 #endif
 
+#ifndef NRF_I2S0
+#define NRF_I2S0 NRF_I2S
+#endif
+
 /**
  * @defgroup nrf_i2s_hal I2S HAL
  * @{
  * @ingroup nrf_i2s
  * @brief   Hardware access layer for managing the Inter-IC Sound (I2S) peripheral.
  */
+
+#if defined(I2S_CONFIG_CLKCONFIG_CLKSRC_Msk) || defined(__NRFX_DOXYGEN__)
+/** @brief Symbol indicating whether clock source configuration is available. */
+#define NRF_I2S_HAS_CLKCONFIG 1
+#else
+#define NRF_I2S_HAS_CLKCONFIG 0
+#endif
 
 /**
  * @brief This value can be provided as a parameter for the @ref nrf_i2s_pins_set
@@ -63,17 +76,23 @@ typedef enum
 /** @brief I2S events. */
 typedef enum
 {
-    NRF_I2S_EVENT_RXPTRUPD = offsetof(NRF_I2S_Type, EVENTS_RXPTRUPD), ///< The RXD.PTR register has been copied to internal double buffers.
-    NRF_I2S_EVENT_TXPTRUPD = offsetof(NRF_I2S_Type, EVENTS_TXPTRUPD), ///< The TXD.PTR register has been copied to internal double buffers.
-    NRF_I2S_EVENT_STOPPED  = offsetof(NRF_I2S_Type, EVENTS_STOPPED)   ///< I2S transfer stopped.
+    NRF_I2S_EVENT_RXPTRUPD   = offsetof(NRF_I2S_Type, EVENTS_RXPTRUPD),  ///< The RXD.PTR register has been copied to internal double buffers.
+    NRF_I2S_EVENT_TXPTRUPD   = offsetof(NRF_I2S_Type, EVENTS_TXPTRUPD),  ///< The TXD.PTR register has been copied to internal double buffers.
+    NRF_I2S_EVENT_STOPPED    = offsetof(NRF_I2S_Type, EVENTS_STOPPED),   ///< I2S transfer stopped.
+#if defined(I2S_INTENSET_FRAMESTART_Msk) || defined(__NRFX_DOXYGEN_)
+    NRF_I2S_EVENT_FRAMESTART = offsetof(NRF_I2S_Type, EVENTS_FRAMESTART) ///< Frame start event, generated on the active edge of LRCK.
+#endif
 } nrf_i2s_event_t;
 
 /** @brief I2S interrupts. */
 typedef enum
 {
-    NRF_I2S_INT_RXPTRUPD_MASK = I2S_INTENSET_RXPTRUPD_Msk, ///< Interrupt on RXPTRUPD event.
-    NRF_I2S_INT_TXPTRUPD_MASK = I2S_INTENSET_TXPTRUPD_Msk, ///< Interrupt on TXPTRUPD event.
-    NRF_I2S_INT_STOPPED_MASK  = I2S_INTENSET_STOPPED_Msk   ///< Interrupt on STOPPED event.
+    NRF_I2S_INT_RXPTRUPD_MASK   = I2S_INTENSET_RXPTRUPD_Msk,  ///< Interrupt on RXPTRUPD event.
+    NRF_I2S_INT_TXPTRUPD_MASK   = I2S_INTENSET_TXPTRUPD_Msk,  ///< Interrupt on TXPTRUPD event.
+    NRF_I2S_INT_STOPPED_MASK    = I2S_INTENSET_STOPPED_Msk,   ///< Interrupt on STOPPED event.
+#if defined(I2S_INTENSET_FRAMESTART_Msk) || defined(__NRFX_DOXYGEN_)
+    NRF_I2S_INT_FRAMESTART_MASK = I2S_INTENCLR_FRAMESTART_Msk ///< Interrupt on FRAMESTART event.
+#endif
 } nrf_i2s_int_mask_t;
 
 /** @brief I2S modes of operation. */
@@ -136,9 +155,24 @@ typedef enum
 /** @brief I2S sample widths. */
 typedef enum
 {
-    NRF_I2S_SWIDTH_8BIT  = I2S_CONFIG_SWIDTH_SWIDTH_8Bit,  ///< 8 bit.
-    NRF_I2S_SWIDTH_16BIT = I2S_CONFIG_SWIDTH_SWIDTH_16Bit, ///< 16 bit.
-    NRF_I2S_SWIDTH_24BIT = I2S_CONFIG_SWIDTH_SWIDTH_24Bit  ///< 24 bit.
+    NRF_I2S_SWIDTH_8BIT          = I2S_CONFIG_SWIDTH_SWIDTH_8Bit,      ///< 8 bit.
+    NRF_I2S_SWIDTH_16BIT         = I2S_CONFIG_SWIDTH_SWIDTH_16Bit,     ///< 16 bit.
+    NRF_I2S_SWIDTH_24BIT         = I2S_CONFIG_SWIDTH_SWIDTH_24Bit,     ///< 24 bit.
+#if defined(I2S_CONFIG_SWIDTH_SWIDTH_32Bit) || defined(__NRFX_DOXYGEN__)
+    NRF_I2S_SWIDTH_32BIT         = I2S_CONFIG_SWIDTH_SWIDTH_32Bit,     ///< 32 bit.
+#endif
+#if defined(I2S_CONFIG_SWIDTH_SWIDTH_8BitIn16) || defined(__NRFX_DOXYGEN__)
+    NRF_I2S_SWIDTH_8BIT_IN16BIT  = I2S_CONFIG_SWIDTH_SWIDTH_8BitIn16,  ///< 8 bit sample in a 16-bit half-frame.
+#endif
+#if defined(I2S_CONFIG_SWIDTH_SWIDTH_8BitIn32) || defined(__NRFX_DOXYGEN__)
+    NRF_I2S_SWIDTH_8BIT_IN32BIT  = I2S_CONFIG_SWIDTH_SWIDTH_8BitIn32,  ///< 8 bit sample in a 32-bit half-frame.
+#endif
+#if defined(I2S_CONFIG_SWIDTH_SWIDTH_16BitIn32) || defined(__NRFX_DOXYGEN__)
+    NRF_I2S_SWIDTH_16BIT_IN32BIT = I2S_CONFIG_SWIDTH_SWIDTH_16BitIn32, ///< 16 bit sample in a 32-bit half-frame.
+#endif
+#if defined(I2S_CONFIG_SWIDTH_SWIDTH_24BitIn32) || defined(__NRFX_DOXYGEN__)
+    NRF_I2S_SWIDTH_24BIT_IN32BIT = I2S_CONFIG_SWIDTH_SWIDTH_24BitIn32, ///< 24 bit sample in a 32-bit half-frame.
+#endif
 } nrf_i2s_swidth_t;
 
 /** @brief I2S alignments of sample within a frame. */
@@ -163,6 +197,14 @@ typedef enum
     NRF_I2S_CHANNELS_RIGHT  = I2S_CONFIG_CHANNELS_CHANNELS_Right   ///< Right only.
 } nrf_i2s_channels_t;
 
+#if NRF_I2S_HAS_CLKCONFIG
+/** @brief I2S Clock source selection. */
+typedef enum
+{
+    NRF_I2S_CLKSRC_PCLK32M = I2S_CONFIG_CLKCONFIG_CLKSRC_PCLK32M, ///< 32MHz peripheral clock.
+    NRF_I2S_CLKSRC_ACLK    = I2S_CONFIG_CLKCONFIG_CLKSRC_ACLK     ///< Audio PLL clock.
+} nrf_i2s_clksrc_t;
+#endif
 
 /**
  * @brief Function for activating the specified I2S task.
@@ -324,6 +366,51 @@ NRF_STATIC_INLINE void nrf_i2s_pins_set(NRF_I2S_Type * p_reg,
                                         uint32_t       sdin_pin);
 
 /**
+ * @brief Function for getting the SCK pin selection.
+ *
+ * @param[in] p_reg Pointer to the structure of registers of the peripheral.
+ *
+ * @return SCK pin selection.
+ */
+NRF_STATIC_INLINE uint32_t nrf_i2s_sck_pin_get(NRF_I2S_Type const * p_reg);
+
+/**
+ * @brief Function for getting the LRCK pin selection.
+ *
+ * @param[in] p_reg Pointer to the structure of registers of the peripheral.
+ *
+ * @return LRCK pin selection.
+ */
+NRF_STATIC_INLINE uint32_t nrf_i2s_lrck_pin_get(NRF_I2S_Type const * p_reg);
+
+/**
+ * @brief Function for getting the MCK pin selection.
+ *
+ * @param[in] p_reg Pointer to the structure of registers of the peripheral.
+ *
+ * @return MCK pin selection.
+ */
+NRF_STATIC_INLINE uint32_t nrf_i2s_mck_pin_get(NRF_I2S_Type const * p_reg);
+
+/**
+ * @brief Function for getting the SDOUT pin selection.
+ *
+ * @param[in] p_reg Pointer to the structure of registers of the peripheral.
+ *
+ * @return SDOUT pin selection.
+ */
+NRF_STATIC_INLINE uint32_t nrf_i2s_sdout_pin_get(NRF_I2S_Type const * p_reg);
+
+/**
+ * @brief Function for getting the SDIN pin selection.
+ *
+ * @param[in] p_reg Pointer to the structure of registers of the peripheral.
+ *
+ * @return SDIN pin selection.
+ */
+NRF_STATIC_INLINE uint32_t nrf_i2s_sdin_pin_get(NRF_I2S_Type const * p_reg);
+
+/**
  * @brief Function for setting the I2S peripheral configuration.
  *
  * @param[in] p_reg        Pointer to the structure of registers of the peripheral.
@@ -408,6 +495,19 @@ NRF_STATIC_INLINE void nrf_i2s_tx_buffer_set(NRF_I2S_Type *   p_reg,
  */
 NRF_STATIC_INLINE uint32_t * nrf_i2s_tx_buffer_get(NRF_I2S_Type const * p_reg);
 
+#if NRF_I2S_HAS_CLKCONFIG
+/**
+ * @brief Function for configuring I2S Clock.
+ *
+ * @param[in] p_reg         Pointer to the structure of registers of the peripheral.
+ * @param[in] clksrc        I2S Clock source selection.
+ * @param[in] enable_bypass Bypass clock generator. MCK will be equal to source input.
+ *                          If bypass is enabled the MCKFREQ setting has no effect.
+ */
+NRF_STATIC_INLINE void nrf_i2s_clk_configure(NRF_I2S_Type *   p_reg,
+                                             nrf_i2s_clksrc_t clksrc,
+                                             bool             enable_bypass);
+#endif
 
 #ifndef NRF_DECLARE_ONLY
 
@@ -427,10 +527,7 @@ NRF_STATIC_INLINE void nrf_i2s_event_clear(NRF_I2S_Type *  p_reg,
                                            nrf_i2s_event_t event)
 {
     *((volatile uint32_t *)((uint8_t *)p_reg + (uint32_t)event)) = 0x0UL;
-#if __CORTEX_M == 0x04
-    volatile uint32_t dummy = *((volatile uint32_t *)((uint8_t *)p_reg + (uint32_t)event));
-    (void)dummy;
-#endif
+    nrf_event_readback((uint8_t *)p_reg + (uint32_t)event);
 }
 
 NRF_STATIC_INLINE bool nrf_i2s_event_check(NRF_I2S_Type const * p_reg,
@@ -512,6 +609,31 @@ NRF_STATIC_INLINE void nrf_i2s_pins_set(NRF_I2S_Type * p_reg,
     p_reg->PSEL.MCK   = mck_pin;
     p_reg->PSEL.SDOUT = sdout_pin;
     p_reg->PSEL.SDIN  = sdin_pin;
+}
+
+NRF_STATIC_INLINE uint32_t nrf_i2s_sck_pin_get(NRF_I2S_Type const * p_reg)
+{
+    return p_reg->PSEL.SCK;
+}
+
+NRF_STATIC_INLINE uint32_t nrf_i2s_lrck_pin_get(NRF_I2S_Type const * p_reg)
+{
+    return p_reg->PSEL.LRCK;
+}
+
+NRF_STATIC_INLINE uint32_t nrf_i2s_mck_pin_get(NRF_I2S_Type const * p_reg)
+{
+    return p_reg->PSEL.MCK;
+}
+
+NRF_STATIC_INLINE uint32_t nrf_i2s_sdout_pin_get(NRF_I2S_Type const * p_reg)
+{
+    return p_reg->PSEL.SDOUT;
+}
+
+NRF_STATIC_INLINE uint32_t nrf_i2s_sdin_pin_get(NRF_I2S_Type const * p_reg)
+{
+    return p_reg->PSEL.SDIN;
 }
 
 NRF_STATIC_INLINE bool nrf_i2s_configure(NRF_I2S_Type *     p_reg,
@@ -597,6 +719,16 @@ NRF_STATIC_INLINE uint32_t * nrf_i2s_tx_buffer_get(NRF_I2S_Type const * p_reg)
 {
     return (uint32_t *)(p_reg->TXD.PTR);
 }
+
+#if NRF_I2S_HAS_CLKCONFIG
+NRF_STATIC_INLINE void nrf_i2s_clk_configure(NRF_I2S_Type *   p_reg,
+                                             nrf_i2s_clksrc_t clksrc,
+                                             bool             enable_bypass)
+{
+    p_reg->CONFIG.CLKCONFIG = ((uint32_t) clksrc << I2S_CONFIG_CLKCONFIG_CLKSRC_Pos) |
+                              ((uint32_t) enable_bypass << I2S_CONFIG_CLKCONFIG_BYPASS_Pos);
+}
+#endif
 
 #endif // NRF_DECLARE_ONLY
 

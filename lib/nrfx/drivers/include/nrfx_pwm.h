@@ -1,6 +1,8 @@
 /*
- * Copyright (c) 2015 - 2019, Nordic Semiconductor ASA
+ * Copyright (c) 2015 - 2022, Nordic Semiconductor ASA
  * All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -94,12 +96,26 @@ typedef struct
     uint8_t output_pins[NRF_PWM_CHANNEL_COUNT]; ///< Pin numbers for individual output channels (optional).
                                                 /**< Use @ref NRFX_PWM_PIN_NOT_USED
                                                  *   if a given output channel is not needed. */
-    uint8_t            irq_priority; ///< Interrupt priority.
-    nrf_pwm_clk_t      base_clock;   ///< Base clock frequency.
-    nrf_pwm_mode_t     count_mode;   ///< Operating mode of the pulse generator counter.
-    uint16_t           top_value;    ///< Value up to which the pulse generator counter counts.
-    nrf_pwm_dec_load_t load_mode;    ///< Mode of loading sequence data from RAM.
-    nrf_pwm_dec_step_t step_mode;    ///< Mode of advancing the active sequence.
+    uint8_t            irq_priority;  ///< Interrupt priority.
+    nrf_pwm_clk_t      base_clock;    ///< Base clock frequency.
+    nrf_pwm_mode_t     count_mode;    ///< Operating mode of the pulse generator counter.
+    uint16_t           top_value;     ///< Value up to which the pulse generator counter counts.
+    nrf_pwm_dec_load_t load_mode;     ///< Mode of loading sequence data from RAM.
+    nrf_pwm_dec_step_t step_mode;     ///< Mode of advancing the active sequence.
+    bool               skip_gpio_cfg; ///< Skip GPIO configuration of pins.
+                                      /**< When set to true, the driver does not modify
+                                       *   any GPIO parameters of the used pins. Those
+                                       *   parameters are supposed to be configured
+                                       *   externally before the driver is initialized. */
+    bool               skip_psel_cfg; ///< Skip pin selection configuration.
+                                      /**< When set to true, the driver does not modify
+                                       *   pin select registers in the peripheral.
+                                       *   Those registers are supposed to be set up
+                                       *   externally before the driver is initialized.
+                                       *   @note When both GPIO configuration and pin
+                                       *   selection are to be skipped, the structure
+                                       *   fields that specify pins can be omitted,
+                                       *   as they are ignored anyway. */
 } nrfx_pwm_config_t;
 
 /**
@@ -117,19 +133,20 @@ typedef struct
  * @param[in] _out_2 PWM output 2 pin.
  * @param[in] _out_3 PWM output 3 pin.
  */
-#define NRFX_PWM_DEFAULT_CONFIG(_out_0, _out_1, _out_2, _out_3)  \
-{                                                                \
-    .output_pins  = { _out_0,                                    \
-                      _out_1,                                    \
-                      _out_2,                                    \
-                      _out_3                                     \
-                    },                                           \
-    .irq_priority = NRFX_PWM_DEFAULT_CONFIG_IRQ_PRIORITY,        \
-    .base_clock   = NRF_PWM_CLK_1MHz,                            \
-    .count_mode   = NRF_PWM_MODE_UP,                             \
-    .top_value    = 1000,                                        \
-    .load_mode    = NRF_PWM_LOAD_COMMON,                         \
-    .step_mode    = NRF_PWM_STEP_AUTO,                           \
+#define NRFX_PWM_DEFAULT_CONFIG(_out_0, _out_1, _out_2, _out_3) \
+{                                                               \
+    .output_pins   = { _out_0,                                  \
+                       _out_1,                                  \
+                       _out_2,                                  \
+                       _out_3                                   \
+                     },                                         \
+    .irq_priority  = NRFX_PWM_DEFAULT_CONFIG_IRQ_PRIORITY,      \
+    .base_clock    = NRF_PWM_CLK_1MHz,                          \
+    .count_mode    = NRF_PWM_MODE_UP,                           \
+    .top_value     = 1000,                                      \
+    .load_mode     = NRF_PWM_LOAD_COMMON,                       \
+    .step_mode     = NRF_PWM_STEP_AUTO,                         \
+    .skip_gpio_cfg = false                                      \
 }
 
 /** @brief PWM flags providing additional playback options. */
@@ -465,6 +482,15 @@ NRFX_STATIC_INLINE uint32_t nrfx_pwm_event_address_get(nrfx_pwm_t const * p_inst
     return nrf_pwm_event_address_get(p_instance->p_registers, event);
 }
 #endif // NRFX_DECLARE_ONLY
+
+/**
+ * @brief Macro returning PWM interrupt handler.
+ *
+ * param[in] idx PWM index.
+ *
+ * @return Interrupt handler.
+ */
+#define NRFX_PWM_INST_HANDLER_GET(idx) NRFX_CONCAT_3(nrfx_pwm_, idx, _irq_handler)
 
 /** @} */
 

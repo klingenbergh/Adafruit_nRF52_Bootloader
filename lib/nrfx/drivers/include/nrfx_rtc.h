@@ -1,6 +1,8 @@
 /*
- * Copyright (c) 2014 - 2019, Nordic Semiconductor ASA
+ * Copyright (c) 2014 - 2022, Nordic Semiconductor ASA
  * All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -358,6 +360,15 @@ NRFX_STATIC_INLINE uint32_t nrfx_rtc_event_address_get(nrfx_rtc_t const * p_inst
     return nrf_rtc_event_address_get(p_instance->p_reg, event);
 }
 #endif // NRFX_DECLARE_ONLY
+
+/**
+ * @brief Macro returning RTC interrupt handler.
+ *
+ * param[in] idx RTC index.
+ *
+ * @return Interrupt handler.
+ */
+#define NRFX_RTC_INST_HANDLER_GET(idx) NRFX_CONCAT_3(nrfx_rtc_, idx, _irq_handler)
 
 /** @} */
 

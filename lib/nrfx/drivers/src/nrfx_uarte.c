@@ -1,6 +1,8 @@
 /*
- * Copyright (c) 2015 - 2019, Nordic Semiconductor ASA
+ * Copyright (c) 2015 - 2022, Nordic Semiconductor ASA
  * All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -96,37 +98,55 @@ typedef struct
     size_t                     rx_buffer_length;
     size_t                     rx_secondary_buffer_length;
     nrfx_drv_state_t           state;
+    bool                       rx_aborted;
+    bool                       skip_gpio_cfg : 1;
+    bool                       skip_psel_cfg : 1;
 } uarte_control_block_t;
 static uarte_control_block_t m_cb[NRFX_UARTE_ENABLED_COUNT];
 
 static void apply_config(nrfx_uarte_t        const * p_instance,
                          nrfx_uarte_config_t const * p_config)
 {
-    if (p_config->pseltxd != NRF_UARTE_PSEL_DISCONNECTED)
-    {
-        nrf_gpio_pin_set(p_config->pseltxd);
-        nrf_gpio_cfg_output(p_config->pseltxd);
-    }
-    if (p_config->pselrxd != NRF_UARTE_PSEL_DISCONNECTED)
-    {
-        nrf_gpio_cfg_input(p_config->pselrxd, NRF_GPIO_PIN_NOPULL);
-    }
-
     nrf_uarte_baudrate_set(p_instance->p_reg, p_config->baudrate);
     nrf_uarte_configure(p_instance->p_reg, &p_config->hal_cfg);
-    nrf_uarte_txrx_pins_set(p_instance->p_reg, p_config->pseltxd, p_config->pselrxd);
+
+    if (!p_config->skip_gpio_cfg)
+    {
+        if (p_config->pseltxd != NRF_UARTE_PSEL_DISCONNECTED)
+        {
+            nrf_gpio_pin_set(p_config->pseltxd);
+            nrf_gpio_cfg_output(p_config->pseltxd);
+        }
+        if (p_config->pselrxd != NRF_UARTE_PSEL_DISCONNECTED)
+        {
+            nrf_gpio_cfg_input(p_config->pselrxd, NRF_GPIO_PIN_NOPULL);
+        }
+    }
+    if (!p_config->skip_psel_cfg)
+    {
+        nrf_uarte_txrx_pins_set(p_instance->p_reg,
+                                p_config->pseltxd, p_config->pselrxd);
+    }
+
     if (p_config->hal_cfg.hwfc == NRF_UARTE_HWFC_ENABLED)
     {
-        if (p_config->pselcts != NRF_UARTE_PSEL_DISCONNECTED)
+        if (!p_config->skip_gpio_cfg)
         {
-            nrf_gpio_cfg_input(p_config->pselcts, NRF_GPIO_PIN_NOPULL);
+            if (p_config->pselrts != NRF_UARTE_PSEL_DISCONNECTED)
+            {
+                nrf_gpio_pin_set(p_config->pselrts);
+                nrf_gpio_cfg_output(p_config->pselrts);
+            }
+            if (p_config->pselcts != NRF_UARTE_PSEL_DISCONNECTED)
+            {
+                nrf_gpio_cfg_input(p_config->pselcts, NRF_GPIO_PIN_NOPULL);
+            }
         }
-        if (p_config->pselrts != NRF_UARTE_PSEL_DISCONNECTED)
+        if (!p_config->skip_psel_cfg)
         {
-            nrf_gpio_pin_set(p_config->pselrts);
-            nrf_gpio_cfg_output(p_config->pselrts);
+            nrf_uarte_hwfc_pins_set(p_instance->p_reg,
+                                    p_config->pselrts, p_config->pselcts);
         }
-        nrf_uarte_hwfc_pins_set(p_instance->p_reg, p_config->pselrts, p_config->pselcts);
     }
 }
 
@@ -160,6 +180,8 @@ static void interrupts_disable(nrfx_uarte_t const * p_instance)
 
 static void pins_to_default(nrfx_uarte_t const * p_instance)
 {
+    uarte_control_block_t const * p_cb = &m_cb[p_instance->drv_inst_idx];
+
     /* Reset pins to default states */
     uint32_t txd;
     uint32_t rxd;
@@ -170,25 +192,71 @@ static void pins_to_default(nrfx_uarte_t const * p_instance)
     rxd = nrf_uarte_rx_pin_get(p_instance->p_reg);
     rts = nrf_uarte_rts_pin_get(p_instance->p_reg);
     cts = nrf_uarte_cts_pin_get(p_instance->p_reg);
-    nrf_uarte_txrx_pins_disconnect(p_instance->p_reg);
-    nrf_uarte_hwfc_pins_disconnect(p_instance->p_reg);
+    if (!p_cb->skip_psel_cfg)
+    {
+        nrf_uarte_txrx_pins_disconnect(p_instance->p_reg);
+        nrf_uarte_hwfc_pins_disconnect(p_instance->p_reg);
+    }
 
-    if (txd != NRF_UARTE_PSEL_DISCONNECTED)
+    if (!p_cb->skip_gpio_cfg)
     {
-        nrf_gpio_cfg_default(txd);
+        if (txd != NRF_UARTE_PSEL_DISCONNECTED)
+        {
+            nrf_gpio_cfg_default(txd);
+        }
+        if (rxd != NRF_UARTE_PSEL_DISCONNECTED)
+        {
+            nrf_gpio_cfg_default(rxd);
+        }
+        if (cts != NRF_UARTE_PSEL_DISCONNECTED)
+        {
+            nrf_gpio_cfg_default(cts);
+        }
+        if (rts != NRF_UARTE_PSEL_DISCONNECTED)
+        {
+            nrf_gpio_cfg_default(rts);
+        }
     }
-    if (rxd != NRF_UARTE_PSEL_DISCONNECTED)
+}
+
+static void apply_workaround_for_enable_anomaly(nrfx_uarte_t const * p_instance)
+{
+#if defined(NRF5340_XXAA_APPLICATION) || defined(NRF5340_XXAA_NETWORK) || defined(NRF9160_XXAA)
+    // Apply workaround for anomalies:
+    // - nRF9160 - anomaly 23
+    // - nRF5340 - anomaly 44
+    volatile uint32_t const * rxenable_reg =
+        (volatile uint32_t *)(((uint32_t)p_instance->p_reg) + 0x564);
+    volatile uint32_t const * txenable_reg =
+        (volatile uint32_t *)(((uint32_t)p_instance->p_reg) + 0x568);
+
+    if (*txenable_reg == 1)
     {
-        nrf_gpio_cfg_default(rxd);
+        nrf_uarte_task_trigger(p_instance->p_reg, NRF_UARTE_TASK_STOPTX);
     }
-    if (cts != NRF_UARTE_PSEL_DISCONNECTED)
+
+    if (*rxenable_reg == 1)
     {
-        nrf_gpio_cfg_default(cts);
+        nrf_uarte_enable(p_instance->p_reg);
+        nrf_uarte_task_trigger(p_instance->p_reg, NRF_UARTE_TASK_STOPRX);
+
+        bool workaround_succeded;
+        // The UARTE is able to receive up to four bytes after the STOPRX task has been triggered.
+        // On lowest supported baud rate (1200 baud), with parity bit and two stop bits configured
+        // (resulting in 12 bits per data byte sent), this may take up to 40 ms.
+        NRFX_WAIT_FOR(*rxenable_reg == 0, 40000, 1, workaround_succeded);
+        if (!workaround_succeded)
+        {
+            NRFX_LOG_ERROR("Failed to apply workaround for instance with base address: %p.",
+                           (void *)p_instance->p_reg);
+        }
+
+        (void)nrf_uarte_errorsrc_get_and_clear(p_instance->p_reg);
+        nrf_uarte_disable(p_instance->p_reg);
     }
-    if (rts != NRF_UARTE_PSEL_DISCONNECTED)
-    {
-        nrf_gpio_cfg_default(rts);
-    }
+#else
+    (void)(p_instance);
+#endif // defined(NRF5340_XXAA_APPLICATION) || defined(NRF5340_XXAA_NETWORK) || defined(NRF9160_XXAA)
 }
 
 nrfx_err_t nrfx_uarte_init(nrfx_uarte_t const *        p_instance,
@@ -234,7 +302,12 @@ nrfx_err_t nrfx_uarte_init(nrfx_uarte_t const *        p_instance,
     }
 #endif // NRFX_CHECK(NRFX_PRS_ENABLED)
 
+    p_cb->skip_gpio_cfg = p_config->skip_gpio_cfg;
+    p_cb->skip_psel_cfg = p_config->skip_psel_cfg;
+
     apply_config(p_instance, p_config);
+
+    apply_workaround_for_enable_anomaly(p_instance);
 
     p_cb->handler   = event_handler;
     p_cb->p_context = p_config->p_context;
@@ -249,15 +322,16 @@ nrfx_err_t nrfx_uarte_init(nrfx_uarte_t const *        p_instance,
     p_cb->rx_secondary_buffer_length = 0;
     p_cb->tx_buffer_length           = 0;
     p_cb->state                      = NRFX_DRV_STATE_INITIALIZED;
-    NRFX_LOG_WARNING("Function: %s, error code: %s.",
-                     __func__,
-                     NRFX_LOG_ERROR_STRING_GET(err_code));
+    NRFX_LOG_INFO("Function: %s, error code: %s.",
+                  __func__,
+                  NRFX_LOG_ERROR_STRING_GET(err_code));
     return err_code;
 }
 
 void nrfx_uarte_uninit(nrfx_uarte_t const * p_instance)
 {
     uarte_control_block_t * p_cb = &m_cb[p_instance->drv_inst_idx];
+    NRF_UARTE_Type * p_reg = p_instance->p_reg;
 
     if (p_cb->handler)
     {
@@ -265,18 +339,38 @@ void nrfx_uarte_uninit(nrfx_uarte_t const * p_instance)
     }
     // Make sure all transfers are finished before UARTE is disabled
     // to achieve the lowest power consumption.
-    nrf_uarte_shorts_disable(p_instance->p_reg, NRF_UARTE_SHORT_ENDRX_STARTRX);
-    nrf_uarte_task_trigger(p_instance->p_reg, NRF_UARTE_TASK_STOPRX);
-    nrf_uarte_event_clear(p_instance->p_reg, NRF_UARTE_EVENT_TXSTOPPED);
-    nrf_uarte_task_trigger(p_instance->p_reg, NRF_UARTE_TASK_STOPTX);
-    while (!nrf_uarte_event_check(p_instance->p_reg, NRF_UARTE_EVENT_TXSTOPPED))
-    {}
+    nrf_uarte_shorts_disable(p_reg, NRF_UARTE_SHORT_ENDRX_STARTRX);
 
-    nrf_uarte_disable(p_instance->p_reg);
+    // Check if there is any ongoing reception.
+    if (p_cb->rx_buffer_length)
+    {
+        nrf_uarte_event_clear(p_reg, NRF_UARTE_EVENT_RXTO);
+        nrf_uarte_task_trigger(p_reg, NRF_UARTE_TASK_STOPRX);
+    }
+
+    nrf_uarte_event_clear(p_reg, NRF_UARTE_EVENT_TXSTOPPED);
+    nrf_uarte_task_trigger(p_reg, NRF_UARTE_TASK_STOPTX);
+
+    // Wait for TXSTOPPED event and for RXTO event, provided that there was ongoing reception.
+    bool stopped;
+
+    // The UARTE is able to receive up to four bytes after the STOPRX task has been triggered.
+    // On lowest supported baud rate (1200 baud), with parity bit and two stop bits configured
+    // (resulting in 12 bits per data byte sent), this may take up to 40 ms.
+    NRFX_WAIT_FOR((nrf_uarte_event_check(p_reg, NRF_UARTE_EVENT_TXSTOPPED) &&
+                  (!p_cb->rx_buffer_length || nrf_uarte_event_check(p_reg, NRF_UARTE_EVENT_RXTO))),
+                  40000, 1, stopped);
+    if (!stopped)
+    {
+        NRFX_LOG_ERROR("Failed to stop instance with base address: %p.", (void *)p_instance->p_reg);
+    }
+
+    nrf_uarte_disable(p_reg);
+
     pins_to_default(p_instance);
 
 #if NRFX_CHECK(NRFX_PRS_ENABLED)
-    nrfx_prs_release(p_instance->p_reg);
+    nrfx_prs_release(p_reg);
 #endif
 
     p_cb->state   = NRFX_DRV_STATE_UNINITIALIZED;
@@ -468,6 +562,7 @@ nrfx_err_t nrfx_uarte_rx(nrfx_uarte_t const * p_instance,
     }
     else
     {
+        p_cb->rx_aborted = false;
         nrf_uarte_int_enable(p_instance->p_reg, NRF_UARTE_INT_ERROR_MASK |
                                                 NRF_UARTE_INT_ENDRX_MASK);
     }
@@ -537,6 +632,7 @@ void nrfx_uarte_rx_abort(nrfx_uarte_t const * p_instance)
     {
         nrf_uarte_shorts_disable(p_instance->p_reg, NRF_UARTE_SHORT_ENDRX_STARTRX);
     }
+    p_cb->rx_aborted = true;
     nrf_uarte_task_trigger(p_instance->p_reg, NRF_UARTE_TASK_STOPRX);
     NRFX_LOG_INFO("RX transaction aborted.");
 }
@@ -564,11 +660,11 @@ static void uarte_irq_handler(NRF_UARTE_Type *        p_uarte,
     else if (nrf_uarte_event_check(p_uarte, NRF_UARTE_EVENT_ENDRX))
     {
         nrf_uarte_event_clear(p_uarte, NRF_UARTE_EVENT_ENDRX);
-        size_t amount = nrf_uarte_rx_amount_get(p_uarte);
-        // If the transfer was stopped before completion, amount of transfered bytes
-        // will not be equal to the buffer length. Interrupted transfer is ignored.
-        if (amount == p_cb->rx_buffer_length)
+
+        // Aborted transfers are handled in RXTO event processing.
+        if (!p_cb->rx_aborted)
         {
+            size_t amount = p_cb->rx_buffer_length;
             if (p_cb->rx_secondary_buffer_length != 0)
             {
                 uint8_t * p_data = p_cb->p_rx_buffer;

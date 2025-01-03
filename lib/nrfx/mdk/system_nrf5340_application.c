@@ -1,6 +1,6 @@
 /*
 
-Copyright (c) 2009-2018 ARM Limited. All rights reserved.
+Copyright (c) 2009-2022 ARM Limited. All rights reserved.
 
     SPDX-License-Identifier: Apache-2.0
 
@@ -26,13 +26,18 @@ NOTICE: This file has been modified by Nordic Semiconductor ASA.
 #include <stdint.h>
 #include <stdbool.h>
 #include "nrf.h"
-#include "nrf_erratas.h"
-#include "system_nrf5340_application.h"
+#include "nrf_peripherals.h"
+#include "nrf53_erratas.h"
+#include "system_nrf53.h"
+#include "system_nrf53_approtect.h"
 
 /*lint ++flb "Enter library region" */
 
+void SystemStoreFICRNS();
 
-#define __SYSTEM_CLOCK      (128000000UL)     /*!< NRF5340 application core uses a fixed System Clock Frequency of 128MHz */
+/* NRF5340 application core uses a variable System Clock Frequency that starts at 64MHz */
+#define __SYSTEM_CLOCK_MAX      (128000000UL)
+#define __SYSTEM_CLOCK_INITIAL  ( 64000000UL)
 
 #define TRACE_PIN_CNF_VALUE (   (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos) | \
                                 (GPIO_PIN_CNF_INPUT_Connect << GPIO_PIN_CNF_INPUT_Pos) | \
@@ -48,19 +53,19 @@ NOTICE: This file has been modified by Nordic Semiconductor ASA.
 #define TRACE_TRACEDATA3_PIN TAD_PSEL_TRACEDATA3_PIN_Tracedata3
 
 #if defined ( __CC_ARM )
-    uint32_t SystemCoreClock __attribute__((used)) = __SYSTEM_CLOCK;
+    uint32_t SystemCoreClock __attribute__((used)) = __SYSTEM_CLOCK_INITIAL;  
 #elif defined ( __ICCARM__ )
-    __root uint32_t SystemCoreClock = __SYSTEM_CLOCK;
+    __root uint32_t SystemCoreClock = __SYSTEM_CLOCK_INITIAL;
 #elif defined   ( __GNUC__ )
-    uint32_t SystemCoreClock __attribute__((used)) = __SYSTEM_CLOCK;
+    uint32_t SystemCoreClock __attribute__((used)) = __SYSTEM_CLOCK_INITIAL;
 #endif
 
 void SystemCoreClockUpdate(void)
 {
 #if defined(NRF_TRUSTZONE_NONSECURE)
-    SystemCoreClock = __SYSTEM_CLOCK >> (NRF_CLOCK_NS->HFCLKCTRL & (CLOCK_HFCLKCTRL_HCLK_Msk));
+    SystemCoreClock = __SYSTEM_CLOCK_MAX >> (NRF_CLOCK_NS->HFCLKCTRL & (CLOCK_HFCLKCTRL_HCLK_Msk));
 #else
-    SystemCoreClock = __SYSTEM_CLOCK >> (NRF_CLOCK_S->HFCLKCTRL & (CLOCK_HFCLKCTRL_HCLK_Msk));
+    SystemCoreClock = __SYSTEM_CLOCK_MAX >> (NRF_CLOCK_S->HFCLKCTRL & (CLOCK_HFCLKCTRL_HCLK_Msk));
 #endif
 }
 
@@ -72,53 +77,62 @@ void SystemInit(void)
         /* Set all ARM SAU regions to NonSecure if TrustZone extensions are enabled.
         * Nordic SPU should handle Secure Attribution tasks */
         #if defined (__ARM_FEATURE_CMSE) && (__ARM_FEATURE_CMSE == 3U)
-          SAU->CTRL |= (1 << SAU_CTRL_ALLNS_Pos);
+            SAU->CTRL |= (1 << SAU_CTRL_ALLNS_Pos);
         #endif
+
+        /* Workaround for Errata 97 "ERASEPROTECT, APPROTECT, or startup problems" found at the Errata document
+           for your device located at https://infocenter.nordicsemi.com/index.jsp  */
+        if (nrf53_errata_97())
+        {
+            if (*((volatile uint32_t *)0x50004A20ul) == 0)
+            {
+                *((volatile uint32_t *)0x50004A20ul) = 0xDul;
+                *((volatile uint32_t *)0x5000491Cul) = 0x1ul;
+                *((volatile uint32_t *)0x5000491Cul) = 0x0ul;
+            }
+        }
 
         /* Trimming of the device. Copy all the trimming values from FICR into the target addresses. Trim
          until one ADDR is not initialized. */
         uint32_t index = 0;
-        for (index = 0; index < 256ul && NRF_FICR_S->TRIMCNF[index].ADDR != (uint32_t *)0xFFFFFFFFul; index++){
+        for (index = 0; index < 32ul && NRF_FICR_S->TRIMCNF[index].ADDR != (uint32_t *)0xFFFFFFFFul; index++){
             #if defined ( __ICCARM__ )
                 /* IAR will complain about the order of volatile pointer accesses. */
                 #pragma diag_suppress=Pa082
             #endif
-            *NRF_FICR_S->TRIMCNF[index].ADDR = NRF_FICR_S->TRIMCNF[index].DATA;
+            *((volatile uint32_t *)NRF_FICR_S->TRIMCNF[index].ADDR) = NRF_FICR_S->TRIMCNF[index].DATA;
             #if defined ( __ICCARM__ )
                 #pragma diag_default=Pa082
             #endif
         }
 
+        /* errata 64 must be before errata 42, as errata 42 is dependant on the changes in errata 64*/
         /* Workaround for Errata 64 "VREGMAIN has invalid configuration when CPU is running at 128 MHz" found at the Errata document
            for your device located at https://infocenter.nordicsemi.com/index.jsp  */
-        if (errata_64())
+        if (nrf53_errata_64())
         {
-            *((volatile uint32_t *)0x50004708ul) = 0x3;
+            *((volatile uint32_t *)0x5000470Cul) = 0x29ul;
+            *((volatile uint32_t *)0x5000473Cul) = 0x3ul;
         }
 
         /* Workaround for Errata 42 "Reset value of HFCLKCTRL is invalid" found at the Errata document
            for your device located at https://infocenter.nordicsemi.com/index.jsp  */
-        if (errata_42())
+        if (nrf53_errata_42())
         {
             *((volatile uint32_t *)0x50039530ul) = 0xBEEF0044ul;
             NRF_CLOCK_S->HFCLKCTRL = CLOCK_HFCLKCTRL_HCLK_Div2 << CLOCK_HFCLKCTRL_HCLK_Pos;
-
-            if (errata_64())
-            {
-                *((volatile uint32_t *)0x50004710ul) = 0x0;
-            }
         }
 
         /* Workaround for Errata 46 "Higher power consumption of LFRC" found at the Errata document
            for your device located at https://infocenter.nordicsemi.com/index.jsp  */
-        if (errata_46())
+        if (nrf53_errata_46())
         {
             *((volatile uint32_t *)0x5003254Cul) = 0;
         }
 
         /* Workaround for Errata 49 "SLEEPENTER and SLEEPEXIT events asserted after pin reset" found at the Errata document
            for your device located at https://infocenter.nordicsemi.com/index.jsp  */
-        if (errata_49())
+        if (nrf53_errata_49())
         {
             if (NRF_RESET_S->RESETREAS & RESET_RESETREAS_RESETPIN_Msk)
             {
@@ -129,12 +143,37 @@ void SystemInit(void)
 
         /* Workaround for Errata 55 "Bits in RESETREAS are set when they should not be" found at the Errata document
            for your device located at https://infocenter.nordicsemi.com/index.jsp  */
-        if (errata_55())
+        if (nrf53_errata_55())
         {
             if (NRF_RESET_S->RESETREAS & RESET_RESETREAS_RESETPIN_Msk){
                 NRF_RESET_S->RESETREAS = ~RESET_RESETREAS_RESETPIN_Msk;
             }
         }
+
+        /* Workaround for Errata 69 "VREGMAIN configuration is not retained in System OFF" found at the Errata document
+           for your device located at https://infocenter.nordicsemi.com/index.jsp  */
+        if (nrf53_errata_69())
+        {
+            *((volatile uint32_t *)0x5000470Cul) =0x65ul;
+        }
+
+        if (nrf53_errata_140())
+        {
+            if (*(volatile uint32_t *)0x50032420 & 0x80000000)
+            {
+                /* Reset occured during calibration */
+                NRF_CLOCK_S->LFCLKSRC = CLOCK_LFCLKSRC_SRC_LFSYNT;
+                NRF_CLOCK_S->TASKS_LFCLKSTART = 1;
+                while (NRF_CLOCK_S->EVENTS_LFCLKSTARTED == 0) {}
+                NRF_CLOCK_S->EVENTS_LFCLKSTARTED = 0;
+                NRF_CLOCK_S->TASKS_LFCLKSTOP = 1;
+                NRF_CLOCK_S->LFCLKSRC = CLOCK_LFCLKSRC_SRC_LFRC;
+            }
+        }
+
+        #if !defined(NRF_SKIP_FICR_NS_COPY_TO_RAM)
+            SystemStoreFICRNS();
+        #endif
         
         #if defined(CONFIG_NFCT_PINS_AS_GPIOS)
 
@@ -210,6 +249,10 @@ void SystemInit(void)
         /* Allow Non-Secure code to run FPU instructions.
          * If only the secure code should control FPU power state these registers should be configured accordingly in the secure application code. */
         SCB->NSACR |= (3UL << 10);
+
+        /* Handle fw-branch APPROTECT setup. */
+        nrf53_handle_approtect();
+
     #endif
 
     /* Enable the FPU if the compiler used floating point unit instructions. __FPU_USED is a MACRO defined by the
@@ -222,6 +265,51 @@ void SystemInit(void)
     #endif
 
     SystemCoreClockUpdate();
+}
+
+/* Workaround to allow NS code to access FICR. Override NRF_FICR_NS to move FICR_NS buffer. */
+#define FICR_SIZE 0x1000ul
+#define RAM_BASE 0x20000000ul
+#define RAM_END  0x2FFFFFFFul
+
+/* Copy FICR_S to FICR_NS RAM region */
+void SystemStoreFICRNS()
+{
+    if ((uint32_t)NRF_FICR_NS < RAM_BASE || (uint32_t)NRF_FICR_NS + FICR_SIZE > RAM_END)
+    {
+        /* FICR_NS is not in RAM. */
+        return;
+    }
+    /* Copy FICR to NS-accessible RAM block. */
+    volatile uint32_t * from            = (volatile uint32_t *)((uint32_t)NRF_FICR_S + (FICR_SIZE - sizeof(uint32_t)));
+    volatile uint32_t * to              = (volatile uint32_t *)((uint32_t)NRF_FICR_NS + (FICR_SIZE - sizeof(uint32_t)));
+    volatile uint32_t * copy_from_end   = (volatile uint32_t *)NRF_FICR_S;
+    while (from >= copy_from_end)
+    {
+        *(to--) = *(from--);
+    }
+
+    /* Make RAM region NS. */
+    uint32_t ram_region = ((uint32_t)NRF_FICR_NS - (uint32_t)RAM_BASE) / SPU_RAMREGION_SIZE;
+    NRF_SPU_S->RAMREGION[ram_region].PERM &= ~(1 << SPU_RAMREGION_PERM_SECATTR_Pos);
+}
+
+/* Block write and execute access to FICR RAM region */
+void SystemLockFICRNS()
+{
+    if ((uint32_t)NRF_FICR_NS < RAM_BASE || (uint32_t)NRF_FICR_NS + FICR_SIZE > RAM_END)
+    {
+        /* FICR_NS is not in RAM. */
+        return;
+    }
+
+    uint32_t ram_region = ((uint32_t)NRF_FICR_NS - (uint32_t)RAM_BASE) / SPU_RAMREGION_SIZE;
+    NRF_SPU_S->RAMREGION[ram_region].PERM &=
+        ~(
+            (1 << SPU_RAMREGION_PERM_WRITE_Pos) |
+            (1 << SPU_RAMREGION_PERM_EXECUTE_Pos)
+        );
+    NRF_SPU_S->RAMREGION[ram_region].PERM |= 1 << SPU_RAMREGION_PERM_LOCK_Pos;
 }
 
 /*lint --flb "Leave library region" */

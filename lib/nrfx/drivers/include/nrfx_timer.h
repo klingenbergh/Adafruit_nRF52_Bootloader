@@ -1,6 +1,8 @@
 /*
- * Copyright (c) 2015 - 2019, Nordic Semiconductor ASA
+ * Copyright (c) 2015 - 2022, Nordic Semiconductor ASA
  * All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -129,8 +131,7 @@ typedef void (* nrfx_timer_event_handler_t)(nrf_timer_event_t event_type,
  *
  * @param[in] p_instance          Pointer to the driver instance structure.
  * @param[in] p_config            Pointer to the structure with the initial configuration.
- * @param[in] timer_event_handler Event handler provided by the user.
- *                                Must not be NULL.
+ * @param[in] timer_event_handler Event handler provided by the user. Can be NULL.
  *
  * @retval NRFX_SUCCESS             Initialization was successful.
  * @retval NRFX_ERROR_INVALID_STATE The instance is already initialized.
@@ -383,6 +384,15 @@ NRFX_STATIC_INLINE uint32_t nrfx_timer_ms_to_ticks(nrfx_timer_t const * p_instan
     return nrf_timer_ms_to_ticks(timer_ms, nrf_timer_frequency_get(p_instance->p_reg));
 }
 #endif // NRFX_DECLARE_ONLY
+
+/**
+ * @brief Macro returning TIMER interrupt handler.
+ *
+ * param[in] idx TIMER index.
+ *
+ * @return Interrupt handler.
+ */
+#define NRFX_TIMER_INST_HANDLER_GET(idx) NRFX_CONCAT_3(nrfx_timer_, idx, _irq_handler)
 
 /** @} */
 
