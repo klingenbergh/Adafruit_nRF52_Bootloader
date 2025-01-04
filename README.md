@@ -117,7 +117,7 @@ You must have have a J-Link available to "unbrick" your device.
 Firstly clone this repo with following commands
 
 ```
-git clone https://github.com/adafruit/Adafruit_nRF52_Bootloader
+git clone https://github.com/klingenbergh/Adafruit_nRF52_Bootloader
 cd Adafruit_nRF52_Bootloader
 git submodule update --init
 ```
@@ -125,7 +125,7 @@ git submodule update --init
 Then build it with `make BOARD={board} all`, for example:
 
 ```
-make BOARD=feather_nrf52840_express all
+make BOARD=xiao_nrf52840_ble_sense all
 ```
 
 For the list of supported boards, run `make` without `BOARD=` :
@@ -142,7 +142,7 @@ Makefile:90: *** BOARD not defined.  Stop
 To flash the bootloader (without softdevice/mbr) using JLink:
 
 ```
-make BOARD=feather_nrf52840_express flash
+make BOARD=xiao_nrf52840_ble_sense flash
 ```
 
 If you are using pyocd as debugger, add `FLASHER=pyocd` to make command:
@@ -154,19 +154,19 @@ make BOARD=feather_nrf52840_express FLASHER=pyocd flash
 To upgrade the bootloader using DFU Serial via port /dev/ttyACM0
 
 ```
-make BOARD=feather_nrf52840_express SERIAL=/dev/ttyACM0 flash-dfu
+make BOARD=xiao_nrf52840_ble_sense SERIAL=/dev/ttyACM0 flash-dfu
 ```
 
 To flash SoftDevice (will also erase chip):
 
 ```
-make BOARD=feather_nrf52840_express flash-sd
+make BOARD=xiao_nrf52840_ble_sense flash-sd
 ```
 
 To flash MBR only
 
 ```
-make BOARD=feather_nrf52840_express flash-mbr
+make BOARD=xiao_nrf52840_ble_sense flash-mbr
 ```
 
 ### Common makefile problems
@@ -176,7 +176,7 @@ make BOARD=feather_nrf52840_express flash-mbr
 If you get the following error ...
 
 ```
-$ make BOARD=feather_nrf52840_express all
+$ make BOARD=xiao_nrf52840_ble_sense all
 Compiling file: main.c
 /bin/sh: /usr/bin/arm-none-eabi-gcc: No such file or directory
 make: *** [_build/main.o] Error 127
@@ -185,7 +185,7 @@ make: *** [_build/main.o] Error 127
 ... you may need to pass the location of the GCC ARM toolchain binaries to `make` using
 the variable `CROSS_COMPILE` as below:
 ```
-$ make CROSS_COMPILE=/opt/gcc-arm-none-eabi-9-2019-q4-major/bin/arm-none-eabi- BOARD=feather_nrf52832 all
+$ make CROSS_COMPILE=/opt/gcc-arm-none-eabi-9-2019-q4-major/bin/arm-none-eabi- BOARD=xiao_nrf52840_ble_sense all
 ```
 
 For other compile errors, check the gcc version with `arm-none-eabi-gcc --version` to insure it is at least 9.x.
